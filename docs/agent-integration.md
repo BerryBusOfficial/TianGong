@@ -199,6 +199,9 @@ session.assertExhausted();
   `PromptHasher` 用 SHA-256 做精确比对；原文不落 trace。
 * `ReplaySession` 是**校验回放**：验证同一 prompt 的结果/工具链是否漂移。要从失败点继续
   执行，仍需检查点状态（`CheckpointService`），trace 本身不还原上下文。
+* 测试脚手架：`@AgentTest` 等价于 `@TianGongApplicationTestStarter`，自动启动上下文并注入；
+  `WorkflowGraphSnapshot.snapshot(registry)` 输出按节点名排序的稳定图快照，
+  `assertMatches(registry, goldenFile)` 与 golden 文件比对（节点/边/START/replay 策略）。
 
 ## 7. 本轮边界
 

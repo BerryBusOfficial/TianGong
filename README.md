@@ -57,6 +57,9 @@ mvn -DskipTests package
 * **可观测与回放**：`TraceRecorder` 记录每次模型调用的 prompt hash、脱敏 prompt/结果、
   token/成本，以及工具参数/结果摘要；`ReplaySession` 用 golden trace 校验 prompt hash
   与结果摘要是否漂移。完整工作流重执行仍依赖检查点，不假装凭 trace 还原状态。
+* **测试脚手架**：`@AgentTest` 是 `@TianGongApplicationTestStarter` 的短别名，
+  自动启动上下文并注入依赖；`WorkflowGraphSnapshot` 输出稳定的节点/边/START/REPLAY 快照，
+  `assertMatches` 与 golden 文件比对，图结构漂移会直接失败。
 
 ## 设计原则
 

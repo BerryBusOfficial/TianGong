@@ -30,7 +30,9 @@ public class TianGongExtension implements TestInstancePostProcessor {
 
     @Override
     public void postProcessTestInstance(Object testInstance, ExtensionContext context) {
-        if (!testInstance.getClass().isAnnotationPresent(TianGongApplicationTestStarter.class)) {
+        Class<?> testClass = testInstance.getClass();
+        if (!testClass.isAnnotationPresent(TianGongApplicationTestStarter.class)
+                && !testClass.isAnnotationPresent(AgentTest.class)) {
             return;
         }
         ResourceLoader.load(testInstance.getClass());
