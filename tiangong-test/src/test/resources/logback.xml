@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  测试期日志配置。
+
+  为什么这里还要有一份：tiangong-core 的日志配置已改名为 logback-tiangong-default.xml，
+  不再参与 logback 的自动加载（库不该替应用决定日志配置 —— 一旦 jar 里带 logback.xml，
+  classpath 上出现两份时谁生效取决于顺序，应用自己的那份会被静默顶掉）。
+  需要沿用框架默认版式的应用/测试，显式 include 即可。
+-->
+<configuration>
+    <include resource="logback-tiangong-default.xml"/>
+</configuration>

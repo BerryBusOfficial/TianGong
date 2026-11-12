@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.taixu</groupId>
+        <artifactId>tiangong</artifactId>
+        <version>0.0.1</version>
+    </parent>
+
+    <artifactId>tiangong-annotations</artifactId>
+    <packaging>pom</packaging>
+
+    <name>TianGong Annotations</name>
+    <description>注解体系聚合模块：注解定义/注解处理器/扫描器</description>
+
+    <modules>
+        <module>annotations-annotation</module>
+        <module>annotations-processor</module>
+        <module>annotations-scanner</module>
+    </modules>
+
+</project>

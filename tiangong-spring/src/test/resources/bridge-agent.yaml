@@ -1,0 +1,5 @@
+# 配置桥测试夹具：文件基础层（agent.yaml 的迁移形态）
+agent:
+  name: from-file
+context:
+  windows: 7

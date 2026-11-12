@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.taixu</groupId>
+        <artifactId>tiangong</artifactId>
+        <version>0.0.1</version>
+    </parent>
+
+    <artifactId>tiangong-skill</artifactId>
+
+    <name>TianGong Skill Integration</name>
+    <description>Skill 适配层：SKILL.md 目录式技能解析（兼容主流 Markdown 技能包格式）与注册</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.taixu</groupId>
+            <artifactId>tiangong-core</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+        <!-- 直接使用 common 类型（AgentContext 等）：显式声明，不依赖 tiangong-core 的传递 -->
+        <dependency>
+            <groupId>com.taixu</groupId>
+            <artifactId>tiangong-common</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+    </dependencies>
+
+</project>

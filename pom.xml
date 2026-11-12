@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.taixu</groupId>
+        <artifactId>taixu-parent</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>tiangong</artifactId>
+    <version>0.0.1</version>
+    <packaging>pom</packaging>
+
+    <name>太虚·天工</name>
+    <description>An Open-source Personal AI Assistant.</description>
+
+    <modules>
+        <module>tiangong-core</module>
+        <module>tiangong-boot</module>
+        <module>tiangong-llm</module>
+        <module>tiangong-memory</module>
+        <module>tiangong-common</module>
+        <module>tiangong-history</module>
+        <module>tiangong-bytebuddy</module>
+        <module>tiangong-test</module>
+        <module>tiangong-trace</module>
+        <module>tiangong-user</module>
+        <module>tiangong-storage</module>
+        <module>tiangong-math</module>
+        <module>tiangong-mcp</module>
+        <module>tiangong-skill</module>
+        <module>tiangong-spring</module>
+        <module>tiangong-agent</module>
+        <module>tiangong-bom</module>
+        <module>tiangong-annotations</module>
+    </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.taixu</groupId>
+                <artifactId>tiangong-bom</artifactId>
+                <version>${project.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.lettuce</groupId>
+            <artifactId>lettuce-core</artifactId>
+            <scope>compile</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- 编译参数（release/编码/注解处理）由 taixu-parent 统一管理；此处仅保留天工自有配置 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+                <configuration>
+                    <useModulePath>false</useModulePath>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

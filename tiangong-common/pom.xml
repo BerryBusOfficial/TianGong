@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.taixu</groupId>
+        <artifactId>tiangong</artifactId>
+        <version>0.0.1</version>
+    </parent>
+
+    <artifactId>tiangong-common</artifactId>
+
+    <name>TianGong Common</name>
+    <description>公共基础：异常体系/工具类/配置树/类型</description>
+
+</project>

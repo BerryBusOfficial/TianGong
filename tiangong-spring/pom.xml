@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.taixu</groupId>
+        <artifactId>tiangong</artifactId>
+        <version>0.0.1</version>
+    </parent>
+
+    <artifactId>tiangong-spring</artifactId>
+    <name>TianGong Spring Integration</name>
+    <description>天工与 Spring Boot 的集成适配层：同进程双容器（服务桥 + 实例桥）。Spring 依赖由本模块自管，不污染 tiangong-bom。</description>
+
+    <properties>
+        <spring-boot.version>3.3.5</spring-boot.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Spring 版本只在集成模块内自管；tiangong-bom 保持 Spring-free -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.taixu</groupId>
+            <artifactId>tiangong-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- spring-boot：SpringApplication / Binder（配置覆盖层）；spring-context 随之传递 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot</artifactId>
+        </dependency>
+        <!-- @SpringBootApplication 的 @EnableAutoConfiguration 在 autoconfigure 模块；用户用得到，集成测试也用它 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+</project>

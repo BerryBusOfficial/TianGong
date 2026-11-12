@@ -1,0 +1,23 @@
+# 框架级测试配置
+# 测试模型统一采用本地 Ollama qwen3:8b
+
+server:
+  port: 18080
+
+agent:
+  framework:
+    global_store:
+      mode: singleton
+    workflow:
+      max_concurrent: 8
+  models:
+    - name: test-ollama
+      provider: ollama
+      model: qwen3:8b
+      base_url: http://localhost:11434
+      api_key: ollama
+
+test:
+  name: hello
+  nested:
+    value: 42

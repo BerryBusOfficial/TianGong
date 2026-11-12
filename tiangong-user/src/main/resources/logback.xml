@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  应用自带日志配置。
+
+  必须自带：tiangong-core 不再往 classpath 里塞 logback.xml（否则会顶掉这份）。
+  这里显式 include 框架提供的默认版式，应用可在 include 之后追加自己的 logger / appender。
+-->
+<configuration>
+    <include resource="logback-tiangong-default.xml"/>
+</configuration>

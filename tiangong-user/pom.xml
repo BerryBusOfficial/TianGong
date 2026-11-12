@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.taixu</groupId>
+        <artifactId>tiangong</artifactId>
+        <version>0.0.1</version>
+    </parent>
+
+    <artifactId>tiangong-user</artifactId>
+
+    <name>TianGong User</name>
+    <description>用户应用示例与验证</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.taixu</groupId>
+            <artifactId>tiangong-core</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+        <!-- 直接使用 common 类型（AgentContext 等）：显式声明，不依赖 tiangong-core 的传递 -->
+        <dependency>
+            <groupId>com.taixu</groupId>
+            <artifactId>tiangong-common</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+        <!-- 单机自运行启动入口（TianGongApplication.run）：宿主形态与引擎分离 -->
+        <dependency>
+            <groupId>com.taixu</groupId>
+            <artifactId>tiangong-boot</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.taixu</groupId>
+            <artifactId>tiangong-trace</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.taixu</groupId>
+            <artifactId>tiangong-skill</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+        <!-- MCP：启用后读 agent.mcp，把外部工具注册进 FunctionRegistry -->
+        <dependency>
+            <groupId>com.taixu</groupId>
+            <artifactId>tiangong-mcp</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.taixu</groupId>
+            <artifactId>tiangong-test</artifactId>
+            <version>${project.parent.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.sshtools</groupId>
+            <artifactId>two-slices</artifactId>
+            <version>0.9.4</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jgrapht</groupId>
+            <artifactId>jgrapht-core</artifactId>
+            <version>1.5.3</version>
+        </dependency>
+    </dependencies>
+
+</project>

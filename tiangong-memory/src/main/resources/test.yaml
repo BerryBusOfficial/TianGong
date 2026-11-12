@@ -1,0 +1,7 @@
+embedding:
+  model: bge-m3
+  options:
+
+memory:
+  weight_threshold: 0.5
+  top_k: 10

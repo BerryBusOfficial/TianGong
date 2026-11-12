@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- =========================================================
+         基础配置（支持系统属性覆盖：
+         -DLOG_PATH=...  -DAPP_NAME=...  -DLOG_LEVEL=...  -DTIANGONG_LOG_LEVEL=...）
+         ========================================================= -->
+
+    <contextName>${APP_NAME:-tiangong}</contextName>
+
+    <!-- 日志目录 -->
+    <property name="LOG_PATH" value="${LOG_PATH:-./logs}"/>
+    <!-- 应用名称 -->
+    <property name="APP_NAME" value="${APP_NAME:-tiangong}"/>
+    <!-- 全局日志级别 -->
+    <property name="LOG_LEVEL" value="${LOG_LEVEL:-INFO}"/>
+    <!-- 框架包日志级别（调试框架内部时调低） -->
+    <property name="TIANGONG_LOG_LEVEL" value="${TIANGONG_LOG_LEVEL:-DEBUG}"/>
+
+    <!-- =========================================================
+         日志格式
+         时间 | 级别 | 线程 | traceId(MDC) | Logger:行号 | 消息
+         ========================================================= -->
+
+    <property name="CONSOLE_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} | %highlight(%-5level) | %cyan([%thread]) | %magenta([%X{traceId:-}]) | %green(%logger{40}:%line) | %msg%n"/>
+
+    <property name="FILE_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} | %-5level | [%thread] | [%X{traceId:-}] | %logger{40}:%line | %msg%n"/>
+
+    <!-- =========================================================
+         Console（同步，保留彩色高亮）
+         ========================================================= -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <pattern>${CONSOLE_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- =========================================================
+         全量日志
+         logs/tiangong.log
+         每天滚动 / 单文件 100MB / 保留 30 天 / 总量 5GB
+         ========================================================= -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/${APP_NAME}.log</file>
+
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <pattern>${FILE_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/archive/${APP_NAME}.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>100MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>5GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- =========================================================
+         ERROR 日志（仅 ERROR 及以上，保留 60 天）
+         ========================================================= -->
+    <appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/${APP_NAME}-error.log</file>
+
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>ERROR</level>
+        </filter>
+
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <pattern>${FILE_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/archive/${APP_NAME}-error.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>100MB</maxFileSize>
+            <maxHistory>60</maxHistory>
+            <totalSizeCap>5GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- =========================================================
+         异步文件写入（IO 与业务解耦，避免日志阻塞 Agent 执行）
+         includeCallerData=true：保留 %line 行号（%line 依赖调用者数据）
+         ========================================================= -->
+    <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="FILE"/>
+        <queueSize>1024</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <includeCallerData>true</includeCallerData>
+    </appender>
+
+    <appender name="ASYNC_ERROR_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="ERROR_FILE"/>
+        <queueSize>512</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <includeCallerData>true</includeCallerData>
+    </appender>
+
+    <!-- 框架内部日志级别（可 -DTIANGONG_LOG_LEVEL=INFO 调高） -->
+    <logger name="org.wutong" level="${TIANGONG_LOG_LEVEL}"/>
+
+    <!-- 第三方库降噪 -->
+    <logger name="io.netty" level="WARN"/>
+    <logger name="io.lettuce" level="WARN"/>
+
+    <!-- =========================================================
+         Root
+         ========================================================= -->
+    <root level="${LOG_LEVEL}">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="ASYNC_FILE"/>
+        <appender-ref ref="ASYNC_ERROR_FILE"/>
+    </root>
+
+    <!-- =========================================================
+         关机日志 flush 说明：
+         这里刻意不再使用 <shutdownHook class="DelayingShutdownHook">。
+         它的语义是"固定 delay 后 context.stop()"，而 shutdown 全过程可能长于该 delay，
+         于是关机后半段的日志（例如 WorkflowScheduler 的残留工作流告警）会被静默吞掉。
+         改由 AgentRuntime 自己排序：agent-runtime-shutdown 跑完 →
+         agent-runtime-log-flush 等异步队列排空后 stop()。
+         ========================================================= -->
+
+</configuration>

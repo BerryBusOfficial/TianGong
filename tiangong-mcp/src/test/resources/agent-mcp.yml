@@ -1,0 +1,14 @@
+agent:
+  mcp:
+    - name: echo-server
+      transport: stdio
+      command: echo
+      args: [ "hello" ]
+    - name: remote-http
+      transport: stream-http
+      url: http://localhost:3001/mcp
+      headers:
+        Authorization: "Bearer test"
+    - name: remote-sse
+      transport: sse
+      url: http://localhost:3002/sse

@@ -1,0 +1,73 @@
+# 配置模板。用法：
+#   cp agent.yml.example agent.yml
+# 然后把里面所有 REPLACE_ME / your-xxx 换成你自己的值。
+#
+# ⚠ agent.yml 已在 .gitignore 里 —— 真实配置含 API key 和令牌，绝不入库。
+#   历史教训：真实 key 曾经被提交进仓库，最后只能靠重写全部历史来清除，
+#   而 GitHub 上的旧对象并不会因为你 force push 就立刻消失。
+#   **一旦泄露，正确的做法永远是去服务商那边轮换密钥**，别指望删历史。
+
+agent:
+  name: PetAgent
+
+  models:
+    # 桌宠的主模型：Agnes AI，走 OpenAI 本家协议。
+    # base_url 带 /v1 是对的（OpenAI 生态的标准写法），框架会避免拼成 /v1/v1/... 。
+    # 换成任意 OpenAI 兼容端点（vLLM / LM Studio / 其它网关）只需改 base_url + model。
+    - name: pet-llm
+      provider: openai
+      model: agnes-2.5-flash
+      base_url: https://api.agnes-ai.cn/v1
+      api_key: sk-REPLACE_ME
+      chat_options:
+        # 桌宠要有性格，别太死板；想让它稳一点就调低
+        temperature: 0.8
+    - name: test-work
+      provider: deepseek
+      model: deepseek-v4-flash
+      base_url: https://api.deepseek.com
+      api_key: sk-REPLACE_ME
+    # 桌宠一期不做向量检索，这条当前没被引用；留着是为了以后接 embedding。
+    - name: embed
+      provider: ollama
+      model: bge-m3
+      base_url: http://localhost:11434
+      embedding_options:
+        truncate: true
+
+  api:
+    port: 2315
+    # 等出口节点回传响应的超时（秒）。本地模型一轮要几十秒，默认 60 会稳定打成 504。
+    response-timeout-seconds: 240
+
+  checkpoint:
+    # 快照负载告警阈值（字符）。超过即按工作流告警一次，提示状态可能无界（契约 A10）。
+    # <= 0 表示关闭告警。默认 65536（64 KiB）。
+    snapshot-warn-chars: 65536
+
+  # MCP：外部工具服务器。连上后它们的工具会进 FunctionRegistry，再由 think 节点披露给模型。
+  # 开关是应用类上的 @EnableMcp —— 关掉则整段不生效。
+  # 工具命名：serverName.toolName（这里是 firefly.xxx）。
+  mcp:
+    - name: firefly
+      transport: stdio
+      # ⚠ Windows 必须写 npx.cmd：npx 本身是 bash 脚本，ProcessBuilder 起不来
+      #   （CreateProcess error=2）。Linux / macOS 上改回 npx。
+      #   首次运行 npx 会现场下载这个包，几十秒都正常。
+      command: npx.cmd
+      args: [ "-y", "@yakupemreyerli/firefly-mcp" ]
+      env:
+        # ↓↓↓ 这两个换成你自己的（Firefly III → 个人访问令牌，是个 JWT）
+        FIREFLY_API_URL: "your-firefly.example"
+        FIREFLY_API_TOKEN: "REPLACE_ME_JWT"
+
+# 桌宠的落盘位置（相对工作目录）
+pet:
+  memory:
+    path: data/memory.json
+  history:
+    path: data/history.json
+
+context:
+  # 消息窗口。系统提示词永远占住槽位 0 不被淘汰，这里是它之外能留多少条对话。
+  windows: 24
