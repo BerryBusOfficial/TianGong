@@ -78,17 +78,26 @@ public final class ToolLoopSupport {
         AgentEventScope.Binding eventBinding = AgentEventScope.capture();
         AgentCallContext.Binding callBinding = AgentCallContext.capture();
 
+        // 推理预算是最内层包装：先于工具循环/事件桥，保证超预算时取消的是供应商流本身，
+        // 而不是已经进入工具回放之后才停。
+        ChatStream<T, TCall> source = raw;
+        if (request != null && request.getMaxReasoningTokens() != null
+                && request.getMaxReasoningTokens() > 0) {
+            source = new ReasoningBudgetChatStream<>(raw, request.getMaxReasoningTokens());
+        }
+
         Factory f = factory;
         if (request != null && f != null) {
             List<ChatRequest.Tool> tools = request.getTools();
             if (tools != null && !tools.isEmpty()) {
                 ToolLoop loop = f.create(request, client);
                 if (loop != null) {
-                    return new ToolLoopChatStream<>(raw, loop, extractor, deltaExtractor,
+                    return new ToolLoopChatStream<>(source, loop, extractor, deltaExtractor,
                             eventBinding, callBinding);
                 }
             }
         }
-        return eventBinding == null ? raw : new EventEmittingChatStream<>(raw, deltaExtractor, eventBinding);
+        return eventBinding == null ? source
+                : new EventEmittingChatStream<>(source, deltaExtractor, eventBinding);
     }
 }

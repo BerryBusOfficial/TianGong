@@ -37,6 +37,13 @@ public class ChatRequest implements Request<Chat> {
      */
     private final ResponseFormat responseFormat;
 
+    /**
+     * 推理 token 预算（0/null = 不限制）。<br>
+     * 由流层 {@code ReasoningBudgetChatStream} 执行；框架用字符数近似 token（不内置厂商
+     * tokenizer），超过即取消上游并以 {@code ReasoningBudgetExceededException} 结束。
+     */
+    private final Integer maxReasoningTokens;
+
     public enum ResponseFormatType {
         TEXT,
         JSON_OBJECT,

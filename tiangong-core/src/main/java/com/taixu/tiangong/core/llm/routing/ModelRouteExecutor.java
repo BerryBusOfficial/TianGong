@@ -165,6 +165,7 @@ public final class ModelRouteExecutor {
                 .model(clientName)
                 .messages(messages)
                 .stream(false)
+                .maxReasoningTokens(route.maxReasoningTokens() > 0 ? route.maxReasoningTokens() : null)
                 .build();
     }
 }

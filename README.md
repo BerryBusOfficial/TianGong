@@ -52,8 +52,9 @@ mvn -DskipTests package
   排序截断、citation 事件与 `toPromptBlock`。换向量库/图扩散不改业务。
 * **模型路由 + 成本**：`ModelRouter` 按任务给候选链；`ModelRouteExecutor` 按链降级、
   空回答重试、记录 `RoutedAttempt`，并通过 `CostLedger` 记 token/成本；`TenantBudgetGuard`
-  在调用前做租户软预算检查。当前只覆盖同步调用；流式路由、推理 token 硬预算与强一致租户
-  扣减尚未实现（见文档边界）。
+  在调用前做租户软预算检查。`ChatRequest.maxReasoningTokens` 由流层
+  `ReasoningBudgetChatStream` 执行：思考超限即取消上游并以异常结束。当前路由执行器仍只覆盖
+  同步调用；流式降级与强一致租户扣减尚未实现（见文档边界）。
 * **可观测与回放**：`TraceRecorder` 记录每次模型调用的 prompt hash、脱敏 prompt/结果、
   token/成本，以及工具参数/结果摘要；`ReplaySession` 用 golden trace 校验 prompt hash
   与结果摘要是否漂移。完整工作流重执行仍依赖检查点，不假装凭 trace 还原状态。
