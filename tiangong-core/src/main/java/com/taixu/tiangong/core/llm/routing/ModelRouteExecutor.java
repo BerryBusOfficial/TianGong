@@ -146,7 +146,7 @@ public final class ModelRouteExecutor {
      * 预留估算：prompt 字符数（保守上界）+ 路由的 maxOutputTokens（未配置按 512）。
      * 这不是账单，只是预算闸门的估计；实际成本仍由 provider usage 结算。
      */
-    private static long estimateMicros(ModelRoute route, List<Message> messages, ModelPricing price) {
+    static long estimateMicros(ModelRoute route, List<Message> messages, ModelPricing price) {
         long promptChars = messages.stream()
                 .mapToLong(message -> message.getContent() == null
                         ? 0 : message.getContent().length())

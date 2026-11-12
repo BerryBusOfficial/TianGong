@@ -172,6 +172,11 @@ RoutedResult result = executor.chat("report", messages);
 * `ChatRequest.maxReasoningTokens` 由 `ReasoningBudgetChatStream` 执行：统计 reasoning
   delta，超过预算立即取消上游并以 `ReasoningBudgetExceededException` 结束。token 用字符数
   近似（中文约 1 字≈1 token，英文偏高），不内置厂商 tokenizer；精确计费仍看 provider usage。
+* 流式路由：`StreamingModelRouteExecutor.stream(task, messages)` 沿用同一 `ModelRouter`。
+  每个候选先写**候选事件日志**；在首个可见事件（正文/思考/工具/引用/产物/结构化）之前
+  不向真实事件流发送任何内容，因此失败/空回答可以安全降级。一旦可见，候选锁定：
+  后续失败只发 error/done，不再切模型——客户端不会收到两段正文，也不会出现工具已执行
+  却被“回退”的情况。
 * `CostLedger` 记录 run/node/user/tenant/model/token/成本；`PricingTable` 用
   「微美元/百万 token」避免浮点累加误差。
 * `TenantBudgetGuard` 在调用前做**原子预留**：`spent + 已预留 + 本次估算 ≤ limit` 才放行，
@@ -213,7 +218,7 @@ session.assertExhausted();
   `@ApiEntranceNode` 路由；下一轮把它做成入口的一种出口类型。
 * 检索 ACL 只能校验 retriever 返回的 `requiredScopes/tenantId` 声明；召回前分区与
   文档密级标注是 retriever 的职责。
-* 路由执行器目前只覆盖**同步**调用；流式降级（已吐出的正文不能撤回）未实现。
+* 路由执行器同步/流式均可用；流式降级只在首个可见事件前生效，已输出内容不撤回。
   `maxReasoningTokens` 已由流层硬截止（字符近似）。租户预算用内存账本做了原子预留/释放；
   跨进程/多实例的强一致扣减未做。
 * `TraceRecorder` 提供 golden trace 校验回放；工作流级「从失败点继续执行」仍依赖检查点，
