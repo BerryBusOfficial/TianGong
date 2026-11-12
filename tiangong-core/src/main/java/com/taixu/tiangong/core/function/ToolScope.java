@@ -108,11 +108,19 @@ public final class ToolScope {
     }
 
     private static boolean matches(String pattern, String toolName) {
-        if ("*".equals(pattern) || pattern.equals(toolName)) {
+        if ("*".equals(pattern)) {
+            return true;
+        }
+        // 工具全名是 BeanName.方法名，而 API 示例常用 report:* 这类域写法；
+        // 两种分隔符等价，避免用户按文档写 report:* 却匹配不到 report.draft。
+        String normalizedPattern = pattern.replace(':', '.');
+        String normalizedName = toolName.replace(':', '.');
+        if (normalizedPattern.equals(normalizedName)) {
             return true;
         }
         if (pattern.endsWith("*")) {
-            return toolName.startsWith(pattern.substring(0, pattern.length() - 1));
+            String prefix = pattern.substring(0, pattern.length() - 1).replace(':', '.');
+            return normalizedName.startsWith(prefix);
         }
         return false;
     }

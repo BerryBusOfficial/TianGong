@@ -36,7 +36,7 @@ public final class ToolAccessPolicy {
         if (definition == null) {
             return Decision.deny("工具定义不存在");
         }
-        ToolScope scope = ToolGovernance.toolScope();
+        ToolScope scope = ToolGovernance.toolScope(context);
         String shortName = definition.getName();
         String fullName = definition.fullName();
         if (scope.denies(shortName) || scope.denies(fullName)) {

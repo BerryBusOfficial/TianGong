@@ -29,6 +29,7 @@ import java.util.Map;
 public final class ToolGovernance {
 
     private static volatile ToolScope toolScope = ToolScope.unrestricted();
+    private static volatile TenantToolPolicy tenantToolPolicy;
     private static volatile ToolApprovalHandler approvalHandler;
     private static volatile ToolAuditSink auditSink = ToolAuditSink.NOOP;
 
@@ -45,10 +46,27 @@ public final class ToolGovernance {
     /** 恢复默认：不限制、不审批、不审计（测试/嵌入式宿主用） */
     public static void reset() {
         configure(ToolScope.unrestricted(), null, ToolAuditSink.NOOP);
+        tenantToolPolicy = null;
     }
 
     public static ToolScope toolScope() {
         return toolScope;
+    }
+
+    /**
+     * 按调用者解析工具策略：配置了租户策略时优先用租户 scope，否则用全局 scope。
+     */
+    public static ToolScope toolScope(AgentCallContext context) {
+        TenantToolPolicy policy = tenantToolPolicy;
+        if (policy == null) {
+            return toolScope;
+        }
+        ToolScope resolved = policy.resolve(context);
+        return resolved == null ? toolScope : resolved;
+    }
+
+    public static void setTenantToolPolicy(TenantToolPolicy policy) {
+        tenantToolPolicy = policy;
     }
 
     public static void setToolScope(ToolScope scope) {

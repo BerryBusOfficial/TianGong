@@ -2,12 +2,17 @@ package com.taixu.tiangong.core.llm;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import lombok.extern.slf4j.Slf4j;
+import com.taixu.tiangong.common.agent.call.AgentCallContext;
 import com.taixu.tiangong.common.function.Arguments;
 import com.taixu.tiangong.common.util.JsonUtil;
 import com.taixu.tiangong.core.function.AgentFunctionDefinition;
 import com.taixu.tiangong.core.function.FunctionRegistry;
 import com.taixu.tiangong.core.function.ToolAccessDeniedException;
 import com.taixu.tiangong.core.function.ToolGovernance;
+import com.taixu.tiangong.core.function.ToolResultLimiter;
+import com.taixu.tiangong.guardrail.GuardrailResult;
+import com.taixu.tiangong.guardrail.GuardrailService;
+import com.taixu.tiangong.guardrail.GuardrailStage;
 import com.taixu.tiangong.llm.api.request.chat.ChatRequest;
 import com.taixu.tiangong.llm.client.LlmClient;
 import com.taixu.tiangong.llm.event.stream.ChatStream;
@@ -22,6 +27,7 @@ import com.taixu.tiangong.trace.TraceRecorder;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 工具循环执行器：把模型请求的工具调用映射到 {@link FunctionRegistry} 里的注册函数，<br>
@@ -84,7 +90,17 @@ public class FunctionToolLoop implements ToolLoop {
         try {
             Object result = ToolGovernance.invoke(
                     definition, Arguments.fromJson(call.arguments()).asMap(), call.name());
-            String text = toResultText(result);
+            String text = ToolResultLimiter.limit(toResultText(result));
+            GuardrailResult guarded = GuardrailService.inspect(
+                    GuardrailStage.TOOL_OUTPUT, text, AgentCallContext.current(),
+                    Map.of("tool", call.name()));
+            if (guarded.blocked()) {
+                String blocked = "工具结果被护栏拦截: " + guarded.reason();
+                log.warn("工具 [{}] 的输出被护栏拦截: {}", call.name(), guarded.reason());
+                emitToolResult(call, "blocked", blocked, startNanos);
+                return blocked;
+            }
+            text = guarded.text();
             log.info("工具调用 [{}] {} -> {}", call.name(), call.arguments(), abbreviate(text));
             emitToolResult(call, "success", text, startNanos);
             return text;

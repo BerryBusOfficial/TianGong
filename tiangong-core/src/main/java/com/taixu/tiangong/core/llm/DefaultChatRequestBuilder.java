@@ -5,11 +5,18 @@ import com.taixu.tiangong.core.function.AgentFunctionDefinition;
 import com.taixu.tiangong.core.function.FunctionRegistry;
 import com.taixu.tiangong.core.function.ToolAccessPolicy;
 import com.taixu.tiangong.core.function.ToolSchemaConverter;
+import com.taixu.tiangong.guardrail.GuardrailBlockedException;
+import com.taixu.tiangong.guardrail.GuardrailDecision;
+import com.taixu.tiangong.guardrail.GuardrailResult;
+import com.taixu.tiangong.guardrail.GuardrailService;
+import com.taixu.tiangong.guardrail.GuardrailStage;
 import com.taixu.tiangong.llm.api.request.chat.ChatRequest;
+import com.taixu.tiangong.llm.message.HumanMessage;
 import com.taixu.tiangong.llm.message.Message;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public final class DefaultChatRequestBuilder implements ChatRequestBuilder {
 
@@ -25,7 +32,7 @@ public final class DefaultChatRequestBuilder implements ChatRequestBuilder {
 
     @Override
     public ChatRequest build(List<Message> messages) {
-        return registry.buildChatRequest(clientName, messages);
+        return registry.buildChatRequest(clientName, guardInput(messages));
     }
 
     @Override
@@ -35,13 +42,13 @@ public final class DefaultChatRequestBuilder implements ChatRequestBuilder {
 
     @Override
     public ChatRequest build(List<Message> messages, Boolean stream, ToolParam toolParam) {
-        return registry.buildChatRequest(clientName, messages, stream,
+        return registry.buildChatRequest(clientName, guardInput(messages), stream,
                 toolParam == ToolParam.NONE ? null : resolveAll());
     }
 
     @Override
     public ChatRequest build(List<Message> messages, Boolean stream) {
-        return registry.buildChatRequest(clientName, messages, stream);
+        return registry.buildChatRequest(clientName, guardInput(messages), stream);
     }
 
     @Override
@@ -51,7 +58,7 @@ public final class DefaultChatRequestBuilder implements ChatRequestBuilder {
 
     @Override
     public ChatRequest build(List<Message> messages, Boolean stream, String... toolFunctions) {
-        return registry.buildChatRequest(clientName, messages, stream, resolve(toolFunctions));
+        return registry.buildChatRequest(clientName, guardInput(messages), stream, resolve(toolFunctions));
     }
 
     @Override
@@ -68,8 +75,31 @@ public final class DefaultChatRequestBuilder implements ChatRequestBuilder {
                 .build();
     }
 
-    private List<ChatRequest.Tool> resolveAll() {
-        // 只把「调用者当前能用」的工具下发给模型：模型看不到无权工具，就不会请求它，
+    private List<Message> guardInput(List<Message> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return messages;
+        }
+        AgentCallContext context = AgentCallContext.current();
+        List<Message> guarded = new ArrayList<>(messages.size());
+        for (Message message : messages) {
+            if (message instanceof HumanMessage human) {
+                GuardrailResult result = GuardrailService.inspect(
+                        GuardrailStage.INPUT, human.getContent(), context,
+                        Map.of("role", "user"));
+                if (result.blocked()) {
+                    throw new GuardrailBlockedException(GuardrailStage.INPUT, result.reason());
+                }
+                if (result.decision() == GuardrailDecision.REDACT) {
+                    guarded.add(new HumanMessage(result.text(), human.getImages(), human.getName()));
+                    continue;
+                }
+            }
+            guarded.add(message);
+        }
+        return guarded;
+    }
+
+    private List<ChatRequest.Tool> resolveAll() {        // 只把「调用者当前能用」的工具下发给模型：模型看不到无权工具，就不会请求它，
         // 也避免了「先诱导模型调用、再在服务端拒绝」这种既费 token 又难解释的流程。
         AgentCallContext context = AgentCallContext.current();
         return functionRegistry.values().stream()

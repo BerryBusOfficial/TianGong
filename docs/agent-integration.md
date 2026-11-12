@@ -223,5 +223,34 @@ session.assertExhausted();
   跨进程/多实例的强一致扣减未做。
 * `TraceRecorder` 提供 golden trace 校验回放；工作流级「从失败点继续执行」仍依赖检查点，
   trace 不还原上下文。`TextRedactor` 是规则脱敏，不是完备 DLP；敏感数据不应进入 trace。
-* 指令注入/输出过滤/租户隔离、HITL 审批节点、工具超时/重试/熔断：P2。
-* `ToolGovernance` 是进程级静态配置；多租户不同策略需要 P2 的租户级作用域。
+* 指令注入/输出过滤/租户隔离已进入 P2 第一刀（见下）；剩余：工具超时/重试/熔断、
+  并行工具、客户端断连取消上游调用。
+* `ToolGovernance` 的审批/审计仍是进程级配置；租户级工具 scope 已支持，租户级审批策略
+  仍需按租户替换 `ToolApprovalHandler`（P2 剩余）。
+
+## 8. P2 第一刀：护栏、租户策略、HITL
+
+- **护栏 SPI**（`tiangong-guardrail`）：`GuardrailStage`（INPUT / TOOL_OUTPUT / MODEL_OUTPUT）、
+  `Guardrail`、`GuardrailChain`、`GuardrailService`。链内前一个改写结果作为后一个输入，
+  遇 BLOCK 停止；护栏自身异常按拦截处理（fail closed）。
+- **内置策略**：
+  - `PiiGuardrail`：邮箱、手机号、身份证、`sk-` / `github_pat_` / `ghp_` 令牌脱敏；
+  - `PromptInjectionGuardrail`：常见「忽略之前指令 / 泄露系统提示 / 开发者模式」句式；
+    INPUT 阶段 BLOCK，工具/模型输出阶段 REDACT；
+  - `UntrustedContentGuardrail`：工具输出加 `<untrusted-tool-output>` 边界与「不可信数据」声明。
+- **接入点**：
+  - `DefaultChatRequestBuilder` 对 `HumanMessage` 走 INPUT 护栏，BLOCK 抛
+    `GuardrailBlockedException`，REDACT 重建消息；
+  - `FunctionToolLoop` 对工具结果走 TOOL_OUTPUT 护栏，BLOCK 以 `status=blocked` 回放；
+  - `StructuredOutputParser` 对模型结果走 MODEL_OUTPUT 护栏，再解析 schema。
+- **租户策略**：`TenantToolPolicy` 按 `tenantId` 解析 `ToolScope`；
+  `ToolAccessPolicy` 先过租户 scope 再过调用者 scope；`ToolScope` 的 `:` 与 `.` 分隔符等价。
+- **工具结果上限**：`ToolResultLimiter` 默认 32k 字符，超出截断并附
+  `omitted/total` 摘要；在护栏前处理，避免超长结果拖垮模型/日志。
+- **HITL**：`HumanApprovalService` 实现 `ToolApprovalHandler`，创建 pending ticket 并阻塞等待；
+  审批 UI/IM/HTTP 端点通过 `pending()/approve()/reject()` 决定；超时/中断/关闭一律拒绝。
+  pending 在内存，跨实例需落库与共享事件总线。
+- **边界**：护栏是规则启发式，不是注入分类器；默认链为空（不安装不改变行为）；
+  普通流式正文尚未逐 delta 过滤，当前覆盖输入、工具输出与结构化输出。
+- 测试：guardrail 独立单测（PII/注入/围栏/租户链/fail closed）、HITL 审批/超时/关闭、
+  租户工具策略；全量测试见提交说明。

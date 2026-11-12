@@ -6,7 +6,7 @@
 
     <groupId>io.github.berrybus-official</groupId>
     <artifactId>tiangong</artifactId>
-    <version>0.0.1</version>
+    <version>0.0.2-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>TianGong Agent Framework</name>
@@ -71,6 +71,7 @@
         <module>tiangong-common</module>
         <module>tiangong-protocol</module>
         <module>tiangong-retrieval</module>
+        <module>tiangong-guardrail</module>
         <module>tiangong-history</module>
         <module>tiangong-bytebuddy</module>
         <module>tiangong-test</module>

@@ -18,6 +18,8 @@ TianGong（CraftEngine）是一个面向 Java 21 的轻量 Agent 框架。它把
 - **多 Provider LLM**：OpenAI、DeepSeek、Ollama；流式输出、工具循环、结构化输出。
 - **调用者上下文与工具治理**：`AgentCallContext`（userId / tenantId / scopes / traceId），
   按 scope 过滤工具，支持审批与审计；失败默认拒绝。
+- **护栏与租户策略**：PII 脱敏、提示注入检测、不可信工具输出围栏、工具结果大小上限；
+  租户级工具 scope；HITL 审批队列（`HumanApprovalService`）。
 - **类型化 Agent 事件**：正文 / 思考 / 工具调用 / 引用 / 产物 / 用量 / 结构化结果，
   带 `seq`、`runId`、`turnId`，支持 SSE 与 `Last-Event-ID` 续传。
 - **检索与引用**：`Retriever` SPI、scope + tenant ACL、citation 去重与提示词上下文拼装。
@@ -56,6 +58,7 @@ flowchart LR
 | `tiangong-llm` | OpenAI / DeepSeek / Ollama 客户端、流式工具循环、结构化输出 |
 | `tiangong-protocol` | 类型化 Agent 事件、SSE 编解码、客户端 SDK |
 | `tiangong-retrieval` | `Retriever` SPI、ACL、citation、上下文拼装 |
+| `tiangong-guardrail` | PII 脱敏、提示注入检测、不可信内容围栏、租户级护栏链 |
 | `tiangong-trace` | prompt hash、脱敏摘要、token/成本、golden trace 校验 |
 | `tiangong-mcp` / `tiangong-skill` | MCP 服务器与目录式技能接入 |
 | `tiangong-spring` | Spring Boot 宿主桥接 |
@@ -255,7 +258,8 @@ mvn -DskipTests package
 
 ## 版本
 
-当前版本 `0.0.1`，已发布到 Maven Central：
+当前发布版本 `0.0.1`，已发布到 Maven Central；`main` 分支开发版本为
+`0.0.2-SNAPSHOT`（包含护栏、租户工具策略与 HITL 审批，尚未发布）。
 
 ```xml
 <dependency>

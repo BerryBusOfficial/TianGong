@@ -1,9 +1,14 @@
 package com.taixu.tiangong.core.llm;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.taixu.tiangong.common.agent.call.AgentCallContext;
 import com.taixu.tiangong.common.util.JsonUtil;
+import com.taixu.tiangong.guardrail.GuardrailResult;
+import com.taixu.tiangong.guardrail.GuardrailService;
+import com.taixu.tiangong.guardrail.GuardrailStage;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 结构化输出解析：从模型正文里抠出 JSON → 校验 schema → 反序列化为目标类型。<br>
@@ -32,6 +37,15 @@ public final class StructuredOutputParser {
     }
 
     public static JsonNode parseTree(String text, StructuredOutput spec) {
+        // 模型输出先过护栏：BLOCK 直接拒绝，REDACT 用脱敏后的文本继续解析。
+        // PII 脱敏只会改字符串值，不会破坏 JSON 结构。
+        GuardrailResult guarded = GuardrailService.inspect(
+                GuardrailStage.MODEL_OUTPUT, text, AgentCallContext.current(), Map.of());
+        if (guarded.blocked()) {
+            throw new StructuredOutputException(
+                    "模型输出被护栏拦截: " + guarded.reason(), List.of(), text, null);
+        }
+        text = guarded.text();
         String json = extractJson(text);
         if (json == null) {
             throw new StructuredOutputException("正文中找不到完整的 JSON 对象/数组", List.of(), text, null);
