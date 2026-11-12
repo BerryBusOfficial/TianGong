@@ -12,18 +12,26 @@
     <artifactId>tiangong-trace</artifactId>
 
     <name>TianGong Trace</name>
-    <description>跟踪与观测</description>
+    <description>
+        可观测与回放：节点/模型调用的 prompt hash、脱敏摘要、token/成本、工具参数与结果摘要；
+        提供内存 trace store 与 golden-trace 回放校验。
+    </description>
 
     <dependencies>
         <dependency>
             <groupId>com.taixu</groupId>
-            <artifactId>tiangong-core</artifactId>
-            <version>0.0.1</version>
+            <artifactId>tiangong-common</artifactId>
+            <version>${project.parent.version}</version>
         </dependency>
         <dependency>
             <groupId>com.taixu</groupId>
-            <artifactId>tiangong-bytebuddy</artifactId>
-            <version>0.0.1</version>
+            <artifactId>tiangong-protocol</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.taixu</groupId>
+            <artifactId>tiangong-llm</artifactId>
+            <version>${project.parent.version}</version>
         </dependency>
     </dependencies>
 

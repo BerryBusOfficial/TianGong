@@ -5,6 +5,7 @@ import com.taixu.tiangong.llm.api.request.chat.ChatRequest;
 import com.taixu.tiangong.llm.api.response.chat.ChatResponse;
 import com.taixu.tiangong.llm.client.LlmClient;
 import com.taixu.tiangong.llm.message.Message;
+import com.taixu.tiangong.trace.TraceRecorder;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -100,6 +101,7 @@ public final class ModelRouteExecutor {
             }
             for (int attempt = 0; attempt <= emptyRetries; attempt++) {
                 long startNanos = System.nanoTime();
+                ModelPricing price = pricing.priceFor(candidate);
                 try {
                     ChatRequest request = requestFactory.create(candidate, safeMessages, route);
                     ChatResponse<?> response = client.chat(request).join();
@@ -108,14 +110,22 @@ public final class ModelRouteExecutor {
                     long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
                     if (content == null || content.isBlank()) {
                         attempts.add(RoutedAttempt.empty(candidate, elapsedMs));
+                        TraceRecorder.recordLlm(candidate, safeMessages, "", 0, 0, 0, 0,
+                                price.currency(), elapsedMs, "empty", null);
                         continue;
                     }
                     attempts.add(RoutedAttempt.success(candidate, elapsedMs, usage));
-                    recordCost(candidate, usage, context);
+                    long cost = price.costMicros(usage.promptTokens(), usage.completionTokens());
+                    recordCost(candidate, usage, cost, price, context);
+                    TraceRecorder.recordLlm(candidate, safeMessages, content,
+                            usage.promptTokens(), usage.completionTokens(), usage.totalTokens(),
+                            cost, price.currency(), elapsedMs, "success", null);
                     return new RoutedResult(candidate, response, attempts);
                 } catch (RuntimeException e) {
                     long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
                     attempts.add(RoutedAttempt.error(candidate, elapsedMs, e.getMessage()));
+                    TraceRecorder.recordLlm(candidate, safeMessages, "", 0, 0, 0, 0,
+                            price.currency(), elapsedMs, "error", e.getMessage());
                     break;   // 同候选不因异常重试；直接降级，避免把一次持续故障放大成 N 次
                 }
             }
@@ -123,12 +133,11 @@ public final class ModelRouteExecutor {
         throw new RoutingException("任务 [" + task + "] 的所有候选模型均失败: " + attempts);
     }
 
-    private void recordCost(String model, TokenUsage usage, AgentCallContext context) {
+    private void recordCost(String model, TokenUsage usage, long cost, ModelPricing price,
+                            AgentCallContext context) {
         if (ledger == CostLedger.NOOP) {
             return;
         }
-        ModelPricing price = pricing.priceFor(model);
-        long cost = price.costMicros(usage.promptTokens(), usage.completionTokens());
         ledger.record(new CostEntry(
                 attr(context, "runId", context == null ? null : context.traceId()),
                 attr(context, "node", null),

@@ -176,14 +176,39 @@ RoutedResult result = executor.chat("report", messages);
 * 默认请求工厂只用 clientName 当 model；生产应传入基于 `LlmRegistry` 的工厂，
   让 model/options/tools 由配置决定。
 
-## 6. 本轮边界
+## 6. P1：可观测与回放
+
+```java
+InMemoryTraceStore traceStore = new InMemoryTraceStore();
+TraceRecorder.install(traceStore);          // 进程级安装；不装则只构造记录、不落库
+
+// 在节点/运行线程里（AgentCallContext 提供 runId/turnId/node）
+TraceRecorder.recordLlm("deepseek-pro", messages, result,
+        1000, 500, 1500, 2000, "USD", 1200, "success", null);
+
+// 回放/回归：按 golden trace 校验 prompt hash 与结果摘要
+ReplaySession session = new ReplaySession(traceStore, "run-1");
+LlmTraceRecord recorded = session.expectLlm(messages);
+session.verifyResult(recorded, actualResult);
+session.assertExhausted();
+```
+
+* `LlmTraceRecord` 记录 prompt hash、脱敏/截断后的 prompt 与结果、token/成本、耗时、状态；
+  `ToolTraceRecord` 记录工具名/调用 id/参数与结果摘要/状态/耗时。
+* `TextRedactor` 抹掉 Bearer / sk- / github_pat_ / api_key / 邮箱等常见敏感串，
+  `PromptHasher` 用 SHA-256 做精确比对；原文不落 trace。
+* `ReplaySession` 是**校验回放**：验证同一 prompt 的结果/工具链是否漂移。要从失败点继续
+  执行，仍需检查点状态（`CheckpointService`），trace 本身不还原上下文。
+
+## 7. 本轮边界
 
 * SSE 端点是独立的 `AgentEventSseServer`，尚未接进 `ApiHttpServer` 的
   `@ApiEntranceNode` 路由；下一轮把它做成入口的一种出口类型。
 * 检索 ACL 只能校验 retriever 返回的 `requiredScopes/tenantId` 声明；召回前分区与
   文档密级标注是 retriever 的职责。
 * 路由执行器目前只覆盖**同步**调用；流式降级（已吐出的正文不能撤回）未实现。
-  `maxReasoningTokens` 目前是路由元数据，尚未做硬截止；租户预算是软校验，强一致扣减与
-  Trace 回放也未落地。
+  `maxReasoningTokens` 目前是路由元数据，尚未做硬截止；租户预算是软校验，强一致扣减未做。
+* `TraceRecorder` 提供 golden trace 校验回放；工作流级「从失败点继续执行」仍依赖检查点，
+  trace 不还原上下文。`TextRedactor` 是规则脱敏，不是完备 DLP；敏感数据不应进入 trace。
 * 指令注入/输出过滤/租户隔离、HITL 审批节点、工具超时/重试/熔断：P2。
 * `ToolGovernance` 是进程级静态配置；多租户不同策略需要 P2 的租户级作用域。

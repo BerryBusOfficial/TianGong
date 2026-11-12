@@ -11,6 +11,10 @@ import com.taixu.tiangong.llm.event.result.ChatResult;
 import com.taixu.tiangong.llm.event.stream.ChatStream;
 import com.taixu.tiangong.llm.message.HumanMessage;
 import com.taixu.tiangong.llm.provider.OpenaiProvider;
+import com.taixu.tiangong.trace.InMemoryTraceStore;
+import com.taixu.tiangong.trace.LlmTraceRecord;
+import com.taixu.tiangong.trace.TraceRecorder;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -25,6 +29,33 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ModelRouteExecutorTest {
 
     private static final ModelPricing PRICING = new ModelPricing(1_000_000, 2_000_000, "USD");
+
+    @AfterEach
+    void tearDown() {
+        TraceRecorder.reset();
+    }
+
+    @Test
+    void recordsTraceForEmptyAttemptAndSuccessfulFallback() {
+        InMemoryTraceStore store = new InMemoryTraceStore();
+        TraceRecorder.install(store);
+        ModelRouteExecutor executor = executor(new InMemoryCostLedger(), 0,
+                Map.of("flash", new FakeClient("", 0, 0, null),
+                        "pro", new FakeClient("ok", 10, 5, null)));
+        AgentCallContext context = new AgentCallContext("u-1", "tenant-1", Set.of(), "trace",
+                Map.of("runId", "run-1", "node", "report"));
+
+        AgentCallContext.callWith(context,
+                () -> executor.chat("report", List.of(new HumanMessage("hi"))));
+
+        List<LlmTraceRecord> traces = store.llmCalls("run-1");
+        assertEquals(2, traces.size());
+        assertEquals("empty", traces.getFirst().status());
+        assertEquals("success", traces.getLast().status());
+        assertEquals(64, traces.getLast().promptHash().length());
+        assertEquals("report", traces.getLast().node());
+        assertEquals(15, traces.getLast().totalTokens());
+    }
 
     @Test
     void fallsBackOnEmptyAnswerAndRecordsCost() {

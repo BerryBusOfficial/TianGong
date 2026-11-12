@@ -10,6 +10,7 @@
 | `tiangong-common` | 公共类型、异常、JSON、沙箱、调用者上下文（`AgentCallContext`） |
 | `tiangong-protocol` | 类型化 Agent 流式事件协议：事件模型、SSE 编解码、内存日志、客户端 SDK |
 | `tiangong-retrieval` | 检索/记忆 SPI：`Retriever`、ACL、citation 事件、提示词上下文拼装 |
+| `tiangong-trace` | 可观测与回放：prompt hash、脱敏摘要、token/成本、工具摘要、golden trace 校验 |
 | `tiangong-llm` | Deepseek / OpenAI / Ollama 客户端、流式工具循环、结构化输出请求 |
 | `tiangong-core` | 容器、AgentLoop、工作流调度、工具治理、检查点、Trace、HTTP 入口 |
 | `tiangong-memory` | 记忆扩展 |
@@ -51,8 +52,11 @@ mvn -DskipTests package
   排序截断、citation 事件与 `toPromptBlock`。换向量库/图扩散不改业务。
 * **模型路由 + 成本**：`ModelRouter` 按任务给候选链；`ModelRouteExecutor` 按链降级、
   空回答重试、记录 `RoutedAttempt`，并通过 `CostLedger` 记 token/成本；`TenantBudgetGuard`
-  在调用前做租户软预算检查。当前只覆盖同步调用；流式路由、推理 token 硬预算、强一致租户
-  扣减与 Trace 回放尚未实现（见文档边界）。
+  在调用前做租户软预算检查。当前只覆盖同步调用；流式路由、推理 token 硬预算与强一致租户
+  扣减尚未实现（见文档边界）。
+* **可观测与回放**：`TraceRecorder` 记录每次模型调用的 prompt hash、脱敏 prompt/结果、
+  token/成本，以及工具参数/结果摘要；`ReplaySession` 用 golden trace 校验 prompt hash
+  与结果摘要是否漂移。完整工作流重执行仍依赖检查点，不假装凭 trace 还原状态。
 
 ## 设计原则
 

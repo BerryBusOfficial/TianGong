@@ -18,6 +18,7 @@ import com.taixu.tiangong.llm.message.AssistantMessage;
 import com.taixu.tiangong.llm.message.Message;
 import com.taixu.tiangong.protocol.event.AgentEvent;
 import com.taixu.tiangong.protocol.event.AgentEventScope;
+import com.taixu.tiangong.trace.TraceRecorder;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -101,9 +102,11 @@ public class FunctionToolLoop implements ToolLoop {
     }
 
     private void emitToolResult(ToolCall call, String status, String result, long startNanos) {
+        long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
         AgentEventScope.emit(new AgentEvent.ToolResult(
-                call.id(), call.name(), status, result,
-                (System.nanoTime() - startNanos) / 1_000_000));
+                call.id(), call.name(), status, result, durationMs));
+        TraceRecorder.recordTool(call.name(), call.id(), call.arguments(), result, status,
+                durationMs, "success".equals(status) ? null : result);
     }
 
     /**
