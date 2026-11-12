@@ -1,84 +1,74 @@
-# 天工（TianGong / CraftEngine）
+# TianGong（天工）
 
-> 太虚生态的底层 Agent 框架：注解式节点编排 + 轻量 IoC 容器 + 多 Provider LLM 流式调用。
+> Java 21 的 Agent 工作流框架：注解式节点编排 + 轻量 IoC 容器 + 多 Provider LLM 流式工具循环。
+
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.berrybus-official/tiangong-core?label=Maven%20Central)](https://central.sonatype.com/artifact/io.github.berrybus-official/tiangong-core)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+![Java](https://img.shields.io/badge/Java-21-orange.svg)
+
+TianGong（CraftEngine）是一个面向 Java 21 的轻量 Agent 框架。它把一次对话或任务拆成注解式节点图，
+用内置 IoC 容器装配节点、工具与 LLM 客户端；模型在流式响应中请求的工具由框架**在流内自动执行并回放**，
+节点只负责业务逻辑，不必手写 `while + call_tool` 循环。
+
+框架不依赖 Spring 运行，也提供可选的 Spring 宿主集成。核心能力包括：
+
+- **注解式工作流**：`START` / `COMMON` / `BRANCH` / `PARALLEL` / `MERGE` / `END` 节点，
+  以及 `@ApiEntranceNode` / `@StdinEntranceNode` / `@ApiExportNode` 等入口出口。
+- **轻量 IoC**：编译期扫描注解、运行期容器注入，支持单例 / 原型作用域与生命周期。
+- **多 Provider LLM**：OpenAI、DeepSeek、Ollama；流式输出、工具循环、结构化输出。
+- **调用者上下文与工具治理**：`AgentCallContext`（userId / tenantId / scopes / traceId），
+  按 scope 过滤工具，支持审批与审计；失败默认拒绝。
+- **类型化 Agent 事件**：正文 / 思考 / 工具调用 / 引用 / 产物 / 用量 / 结构化结果，
+  带 `seq`、`runId`、`turnId`，支持 SSE 与 `Last-Event-ID` 续传。
+- **检索与引用**：`Retriever` SPI、scope + tenant ACL、citation 去重与提示词上下文拼装。
+- **路由与成本**：按任务选择候选模型、失败/空回答降级、推理 token 预算、token 成本账本。
+- **可观测与恢复**：trace + golden trace 校验、检查点恢复、沙箱、MCP 与目录式技能。
+
+## 架构
+
+```mermaid
+flowchart LR
+    E["HTTP / STDIN / MCP"] --> S["WorkflowScheduler"]
+    S --> X["AgentLoopExecutor"]
+    X --> G["@AgentNode graph"]
+    G --> C["AgentContext state"]
+    G --> L["LLM clients"]
+    L --> P["OpenAI / DeepSeek / Ollama"]
+    L --> T["@AgentFunction tools"]
+    G --> V["Typed events / SSE"]
+    G --> R["Trace / replay"]
+    Q["Retriever + ACL"] --> G
+    V --> U["Web / mobile SDK"]
+```
+
+一次运行中，`AgentLoopExecutor` 按 `@NodeNext` 推进节点；节点读写 `AgentContext`，通过
+`LlmClient` 发起流式请求。模型请求工具时，框架查询 `FunctionRegistry`、执行工具并把结果回放给模型，
+直到模型不再请求工具。事件、引用与 trace 是可选的旁路，不改变主执行链。
 
 ## 模块
 
 | 模块 | 作用 |
 | :--- | :--- |
-| `tiangong-annotations` | 注解与注解处理器（组件/节点/工具/生命周期） |
-| `tiangong-common` | 公共类型、异常、JSON、沙箱、调用者上下文（`AgentCallContext`） |
-| `tiangong-protocol` | 类型化 Agent 流式事件协议：事件模型、SSE 编解码、内存日志、客户端 SDK |
-| `tiangong-retrieval` | 检索/记忆 SPI：`Retriever`、ACL、citation 事件、提示词上下文拼装 |
-| `tiangong-trace` | 可观测与回放：prompt hash、脱敏摘要、token/成本、工具摘要、golden trace 校验 |
-| `tiangong-llm` | Deepseek / OpenAI / Ollama 客户端、流式工具循环、结构化输出请求 |
-| `tiangong-core` | 容器、AgentLoop、工作流调度、工具治理、检查点、Trace、HTTP 入口 |
-| `tiangong-memory` | 记忆扩展 |
-| `tiangong-mcp` / `tiangong-skill` | MCP 与目录式技能接入 |
-| `tiangong-spring` | Spring 宿主桥接 |
-| `tiangong-user` / `tiangong-test` | 示例应用与集成测试 |
+| `tiangong-annotations` | 注解定义、编译期处理器与扫描器 |
+| `tiangong-common` | 公共类型、异常、JSON、沙箱、调用者上下文 |
+| `tiangong-core` | 容器、AgentLoop、工作流调度、工具治理、检查点、HTTP 入口 |
+| `tiangong-boot` | 单机启动入口 `TianGongApplication` |
+| `tiangong-llm` | OpenAI / DeepSeek / Ollama 客户端、流式工具循环、结构化输出 |
+| `tiangong-protocol` | 类型化 Agent 事件、SSE 编解码、客户端 SDK |
+| `tiangong-retrieval` | `Retriever` SPI、ACL、citation、上下文拼装 |
+| `tiangong-trace` | prompt hash、脱敏摘要、token/成本、golden trace 校验 |
+| `tiangong-mcp` / `tiangong-skill` | MCP 服务器与目录式技能接入 |
+| `tiangong-spring` | Spring Boot 宿主桥接 |
+| `tiangong-test` / `tiangong-user` | 测试脚手架与示例应用 |
+| `tiangong-bom` | 天工模块与第三方依赖版本管理 |
 
-## 构建
+## 快速开始
 
-要求 JDK 21、Maven 3.9+。
+环境要求：JDK 21、Maven 3.9+。
 
-```bash
-mvn test
-mvn -DskipTests package
-```
+### 1. 引入依赖
 
-## 第一轮集成契约（2026-11-12）
-
-针对 ReportHub 集成侧反馈，先落地三个 P0：
-
-1. **调用者上下文 + 工具治理**
-   `AgentCallContext`（userId / tenantId / scopes / traceId）从 HTTP 头注入 fork 线程；
-   `@AgentFunction(scopes = ..., requiresApproval = ...)` 声明工具权限；
-   请求构建时按 scope 过滤工具，执行期同一判据再校验；审批失败默认拒绝，审计旁路记录。
-2. **类型化流式事件 + SDK**
-   `message.delta` / `reasoning.delta` / `tool.call` / `tool.result` / `citation` /
-   `artifact` / `usage` / `structured` / `error` / `done`，带 `seq`、`runId`、`turnId`；
-   `AgentEventSseServer` 支持 `Last-Event-ID` 续传与断连取消，`AgentEventClient` 提供统一解析。
-3. **结构化输出契约**
-   `JsonSchemaGenerator` 从 record/POJO 生成 schema；OpenAI 下发 `json_schema`，
-   Deepseek/Ollama 走 `json_object`/提示词 + 框架侧校验；失败带错误路径修复重试；
-   校验通过发 `structured` 事件，不再用 `<<<REPORT_DRAFT>>>` 一类哨兵从正文抠 JSON。
-
-完整用法与边界见 [docs/agent-integration.md](docs/agent-integration.md)。
-
-## 第二轮 P1（已完成，2026-11-12）
-
-* **检索/记忆 SPI**：`Retriever` 只负责召回；`RetrievalService` 统一做 ACL（scope + tenant）、
-  排序截断、citation 事件与 `toPromptBlock`。换向量库/图扩散不改业务。
-* **模型路由 + 成本**：`ModelRouter` 按任务给候选链；`ModelRouteExecutor` 做同步降级、
-  空回答重试与成本记账；`StreamingModelRouteExecutor` 做流式降级——只要首个可见事件
-  （正文/思考/工具/引用/产物）还没发出，就允许换候选；一旦可见即锁定，失败只报错不切换，
-  避免客户端收到两段正文。`TenantBudgetGuard` 在调用前做原子预算预留/释放（内存账本），
-  并发请求不会同时穿透同一租户预算。`ChatRequest.maxReasoningTokens` 由流层
-  `ReasoningBudgetChatStream` 执行：思考超限即取消上游并以异常结束。跨进程强一致租户扣减
-  仍未实现（见文档边界）。
-* **可观测与回放**：`TraceRecorder` 记录每次模型调用的 prompt hash、脱敏 prompt/结果、
-  token/成本，以及工具参数/结果摘要；`ReplaySession` 用 golden trace 校验 prompt hash
-  与结果摘要是否漂移。完整工作流重执行仍依赖检查点，不假装凭 trace 还原状态。
-* **测试脚手架**：`@AgentTest` 是 `@TianGongApplicationTestStarter` 的短别名，
-  自动启动上下文并注入依赖；`WorkflowGraphSnapshot` 输出稳定的节点/边/START/REPLAY 快照，
-  `assertMatches` 与 golden 文件比对，图结构漂移会直接失败。
-
-## Maven Central
-
-坐标（groupId 为 `io.github.berrybus-official`，版本 `0.0.1`）：
-
-```xml
-<dependency>
-    <groupId>io.github.berrybus-official</groupId>
-    <artifactId>tiangong-core</artifactId>
-    <version>0.0.1</version>
-</dependency>
-```
-
-常用模块：`tiangong-common`、`tiangong-protocol`、`tiangong-llm`、`tiangong-retrieval`、
-`tiangong-trace`、`tiangong-core`、`tiangong-mcp`、`tiangong-skill`、`tiangong-spring`；
-版本统一由 `tiangong-bom` 管理：
+推荐先导入 BOM，再按需引入模块。`tiangong-boot` 会传递引入核心、注解与 LLM 模块：
 
 ```xml
 <dependencyManagement>
@@ -92,47 +82,196 @@ mvn -DskipTests package
         </dependency>
     </dependencies>
 </dependencyManagement>
+
+<dependencies>
+    <dependency>
+        <groupId>io.github.berrybus-official</groupId>
+        <artifactId>tiangong-boot</artifactId>
+    </dependency>
+</dependencies>
 ```
 
-发布前准备：
+### 2. 定义上下文与节点
 
-* 在 Central Portal 获取 token，写入 `~/.m2/settings.xml` 的 `central` server；
-* 生成/导入 GPG 签名密钥，并上传公钥到 keyserver（如 `keyserver.ubuntu.com`）；
-* 确认 GitHub 账号 `berrybus-official` 拥有 `io.github.berrybus-official` 命名空间。
+把启动类、上下文和节点放在同一个包下，框架会自动扫描启动类所在包：
 
-Windows 上 GPG 通常不在 Maven 进程 PATH 里，先补 PATH：
+```java
+package com.example.demo;
 
-```powershell
-$env:PATH = "C:\Program Files\GnuPG\bin;$env:PATH"
-gpg --list-secret-keys --keyid-format LONG
-# 没有密钥时：
-# gpg --full-generate-key
-# gpg --keyserver keyserver.ubuntu.com --send-keys <KEY_ID>
+import com.taixu.tiangong.annotations.annotation.definition.Lifecycle;
+import com.taixu.tiangong.annotations.annotation.framework.Component;
+import com.taixu.tiangong.annotations.annotation.framework.Scope;
+import com.taixu.tiangong.common.agent.context.AgentContext;
+
+@Component
+@Scope(Lifecycle.PROTOTYPE)
+public class DemoContext implements AgentContext {
+
+    String message;
+    private volatile String workflowId;
+    private volatile boolean cancelled;
+
+    @Override
+    public String workflowId() {
+        return workflowId;
+    }
+
+    @Override
+    public void bindWorkflow(String workflowId) {
+        this.workflowId = workflowId;
+    }
+
+    @Override
+    public boolean isCancelled() {
+        return cancelled;
+    }
+
+    @Override
+    public void cancel() {
+        this.cancelled = true;
+    }
+}
 ```
 
-签名口令由 gpg-agent / Kleopatra pinentry 处理。CI 无交互时可在 `settings.xml` 配置
-`gpg.passphrase`，或用 `-Dgpg.passphrase=...`（不要提交到仓库）。
+```java
+package com.example.demo;
+
+import com.taixu.tiangong.annotations.annotation.framework.Component;
+import com.taixu.tiangong.annotations.annotation.framework.agent.loop.AgentNode;
+import com.taixu.tiangong.annotations.annotation.framework.agent.loop.NodeNext;
+import com.taixu.tiangong.annotations.annotation.framework.agent.loop.NodeType;
+
+@Component
+public class DemoAgent {
+
+    @AgentNode(value = "start", type = NodeType.START)
+    @NodeNext("hello")
+    public DemoContext start(DemoContext context) {
+        context.message = "Hello, TianGong";
+        return context;
+    }
+
+    @AgentNode("hello")
+    @NodeNext("end")
+    public DemoContext hello(DemoContext context) {
+        System.out.println(context.message);
+        return context;
+    }
+
+    @AgentNode(value = "end", type = NodeType.END)
+    public void end(DemoContext context) {
+        // 本轮结束
+    }
+}
+```
+
+### 3. 启动
+
+```java
+package com.example.demo;
+
+import com.taixu.tiangong.annotations.annotation.framework.TianGongApplicationStarter;
+import com.taixu.tiangong.annotations.annotation.framework.enable.EnableAgentLoop;
+import com.taixu.tiangong.boot.TianGongApplication;
+
+@TianGongApplicationStarter
+@EnableAgentLoop(contextClass = DemoContext.class)
+public class DemoApplication {
+
+    public static void main(String[] args) throws Exception {
+        TianGongApplication.run(DemoApplication.class, args);
+    }
+}
+```
+
+在 IDE 中运行 `DemoApplication#main`，或使用 `mvn compile exec:java -Dexec.mainClass=com.example.demo.DemoApplication`。
+这个最小示例不需要 LLM 配置；接入模型后再在节点中调用 `LlmClient`。
+
+### 4. 接入 LLM 与工具
+
+在 `src/main/resources/agent.yml` 配置模型（不要把真实 key 提交到仓库）：
+
+```yaml
+agent:
+  models:
+    - name: chat
+      provider: deepseek
+      model: deepseek-chat
+      base_url: https://api.deepseek.com
+      api_key: replace-with-your-key
+      chat_options:
+        temperature: 0.7
+```
+
+用注解声明工具，框架会自动注册到 `FunctionRegistry`：
+
+```java
+package com.example.demo;
+
+import com.taixu.tiangong.annotations.annotation.framework.agent.AgentFunction;
+import com.taixu.tiangong.annotations.annotation.framework.agent.AgentTool;
+
+import java.time.LocalDateTime;
+
+@AgentTool
+public class TimeTools {
+
+    @AgentFunction(name = "get_time", description = "获取当前时间")
+    public String now() {
+        return LocalDateTime.now().toString();
+    }
+}
+```
+
+在节点中通过 `LlmClient` + `ChatRequestBuilder` 发起流式请求即可；工具调用由框架在流内执行，
+节点只需拼接 `onData` 的正文并在 `onComplete` 后保存结果。完整示例见
+[`tiangong-user`](tiangong-user) 的 `PetAgentNode`。
+
+### HTTP 入口
+
+在节点方法上使用 `@ApiEntranceNode` / `@ApiExportNode` 即可把工作流暴露为 HTTP 接口；
+需要流式推送时，可将 `tiangong-protocol` 的 `AgentEventSseServer` 挂到任意 HTTP 端口。
+具体契约见 [`docs/agent-integration.md`](docs/agent-integration.md)。
+
+## 构建
 
 ```bash
-# 正常构建不会签名/发布
+git clone https://github.com/BerryBusOfficial/TianGong.git
+cd TianGong
 mvn clean test
-
-# 发布：sources + javadoc + GPG + Central Portal bundle（autoPublish=false）
-mvn -Pcentral-publish clean deploy
 ```
 
-`central-publish` profile 只在这个命令下生效；发布后在 Central Portal 手动确认（或将
-`autoPublish` 改为 `true`）。父 POM 已改为独立根 POM，不再依赖外部 `taixu-parent` 的
-`1.0-SNAPSHOT`。
+多模块打包：
 
-## 设计原则
+```bash
+mvn -DskipTests package
+```
 
-* **状态与身份分离**：`AgentContext` 是可检查点的工作流状态；`AgentCallContext` 是请求身份，
-  不写快照，避免恢复时把上一个用户的权限带进新请求。
-* **同一判据**：工具「是否下发给模型」与「能否执行」共用 `ToolAccessPolicy`，不出现两套规则。
-* **失败默认拒绝**：审批处理器缺失/异常按拒绝处理；工具执行失败把原因回放给模型，不炸整条流。
-* **协议层不依赖宿主**：事件协议/SSE 不依赖 `@ApiEntranceNode`，可挂到任意 HTTP 端口。
+## 文档与示例
 
-## 开源协议
+- [集成契约](docs/agent-integration.md)：调用者上下文、工具治理、类型化事件、检索/ACL、路由与 trace。
+- [示例应用](tiangong-user)：桌宠 Agent，包含 STDIN / HTTP 入口、工具、记忆、MCP 与检查点。
+- [测试脚手架](tiangong-test)：`@AgentTest`、工作流图快照与集成测试。
+
+## 版本
+
+当前版本 `0.0.1`，已发布到 Maven Central：
+
+```xml
+<dependency>
+    <groupId>io.github.berrybus-official</groupId>
+    <artifactId>tiangong-core</artifactId>
+    <version>0.0.1</version>
+</dependency>
+```
+
+早期版本 API 仍可能调整；升级前请查看 release notes。
+
+## 参与贡献
+
+欢迎提交 Issue 与 Pull Request。较大的接口或行为变更，建议先开 Issue 讨论设计边界，
+再提交实现与测试。
+
+## 许可证
 
 本项目采用 [Apache License 2.0](LICENSE)。
