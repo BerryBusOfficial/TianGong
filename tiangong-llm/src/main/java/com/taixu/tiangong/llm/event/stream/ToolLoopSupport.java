@@ -1,7 +1,9 @@
 package com.taixu.tiangong.llm.event.stream;
 
+import com.taixu.tiangong.common.agent.call.AgentCallContext;
 import com.taixu.tiangong.llm.api.request.chat.ChatRequest;
 import com.taixu.tiangong.llm.client.LlmClient;
+import com.taixu.tiangong.protocol.event.AgentEventScope;
 
 import java.util.List;
 import java.util.function.Function;
@@ -42,36 +44,51 @@ public final class ToolLoopSupport {
     }
 
     /**
-     * 升级流：<b>请求带工具且已装配工厂</b>时返回循环流，否则原样返回裸流。<br>
-     * <br>
-     * 三个前置条件缺一不可：
-     * <ol>
-     *     <li>工厂已安装 —— 纯 llm 环境不循环；</li>
-     *     <li>请求下发了工具 —— 没有工具就不可能有工具调用；</li>
-     *     <li>工厂愿意受理 —— 框架配置（{@code agent.tools.auto-loop}）可整体关闭。</li>
-     * </ol>
-     *
-     * @param raw       裸流（单轮）
-     * @param request   原始请求（循环层回放消息时以此为基础）
-     * @param client    发起流的客户端（循环层用它续发下一轮）
-     * @param extractor 把 provider 私有的调用类型映射为 {@link ToolCall}
+     * 兼容入口：不提供正文抽取器时由事件桥按 {@code ChatChunkResponse#getContent()} 兜底。
      */
     public static <T, TCall> ChatStream<T, TCall> wrap(ChatStream<T, TCall> raw,
                                                        ChatRequest request,
                                                        LlmClient<?, ?> client,
                                                        Function<TCall, ToolCall> extractor) {
+        return wrap(raw, request, client, extractor, null);
+    }
+
+    /**
+     * 升级流：<b>请求带工具且已装配工厂</b>时返回循环流，否则原样返回裸流。<br>
+     * <br>
+     * 事件桥：只要当前线程有 {@link AgentEventScope.Binding}，即使没有工具，也会包一层
+     * {@link EventEmittingChatStream} 把正文/思考/用量/终止发成类型化事件。绑定在
+     * <b>创建流时</b>捕获，因为真正的读取在另一个虚拟线程里，ThreadLocal 不会自动继承。
+     *
+     * @param raw            裸流（单轮）
+     * @param request        原始请求（循环层回放消息时以此为基础）
+     * @param client         发起流的客户端（循环层用它续发下一轮）
+     * @param extractor      把 provider 私有的调用类型映射为 {@link ToolCall}
+     * @param deltaExtractor 把 provider 私有 chunk 映射为正文增量；null 时按
+     *                       {@code ChatChunkResponse#getContent()} 兜底
+     */
+    public static <T, TCall> ChatStream<T, TCall> wrap(ChatStream<T, TCall> raw,
+                                                       ChatRequest request,
+                                                       LlmClient<?, ?> client,
+                                                       Function<TCall, ToolCall> extractor,
+                                                       Function<T, String> deltaExtractor) {
+        if (raw == null) {
+            return null;
+        }
+        AgentEventScope.Binding eventBinding = AgentEventScope.capture();
+        AgentCallContext.Binding callBinding = AgentCallContext.capture();
+
         Factory f = factory;
-        if (raw == null || f == null || request == null) {
-            return raw;
+        if (request != null && f != null) {
+            List<ChatRequest.Tool> tools = request.getTools();
+            if (tools != null && !tools.isEmpty()) {
+                ToolLoop loop = f.create(request, client);
+                if (loop != null) {
+                    return new ToolLoopChatStream<>(raw, loop, extractor, deltaExtractor,
+                            eventBinding, callBinding);
+                }
+            }
         }
-        List<ChatRequest.Tool> tools = request.getTools();
-        if (tools == null || tools.isEmpty()) {
-            return raw;
-        }
-        ToolLoop loop = f.create(request, client);
-        if (loop == null) {
-            return raw;
-        }
-        return new ToolLoopChatStream<>(raw, loop, extractor);
+        return eventBinding == null ? raw : new EventEmittingChatStream<>(raw, deltaExtractor, eventBinding);
     }
 }

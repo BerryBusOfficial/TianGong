@@ -5,6 +5,7 @@ import com.taixu.tiangong.annotations.annotation.framework.Component;
 import com.taixu.tiangong.common.exception.ToolInvokeException;
 import com.taixu.tiangong.core.container.context.ContextHolder;
 import com.taixu.tiangong.core.function.FunctionRegistry;
+import com.taixu.tiangong.core.function.ToolGovernance;
 
 import java.util.Map;
 
@@ -31,7 +32,7 @@ public class AgentToolInvoker {
     public Object invoke(String toolName, Map<String, Object> arguments) {
         var tool = registry().get(toolName);
         if (tool.isPresent()) {
-            return tool.get().invoke(arguments);
+            return ToolGovernance.invoke(tool.get(), arguments, toolName);
         }
         throw new ToolInvokeException(toolName);
     }

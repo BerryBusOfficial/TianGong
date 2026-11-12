@@ -28,6 +28,41 @@ public class ChatRequest implements Request<Chat> {
 
     private final ChatOptions<?> chatOptions;
 
+    /**
+     * 结构化输出约束（provider 无关）。<br>
+     * 由 {@code StructuredOutput} 生成；具体 provider 决定下发成
+     * {@code response_format=json_schema}（OpenAI）、{@code json_object}（Deepseek）
+     * 还是 {@code format=schema}（Ollama）。provider 不支持时至少保留提示词约束，
+     * 由框架侧再做校验/修复，而不是假装厂商一定守约。
+     */
+    private final ResponseFormat responseFormat;
+
+    public enum ResponseFormatType {
+        TEXT,
+        JSON_OBJECT,
+        JSON_SCHEMA
+    }
+
+    /**
+     * @param name   schema 名（通常是目标类型简单名）
+     * @param strict 是否要求 provider 严格按 schema 输出
+     * @param schema JSON Schema（Map 形式，便于跨 provider 转换）
+     */
+    public record ResponseFormat(ResponseFormatType type, String name, boolean strict,
+                                 Map<String, Object> schema) {
+        public static ResponseFormat text() {
+            return new ResponseFormat(ResponseFormatType.TEXT, null, false, null);
+        }
+
+        public static ResponseFormat jsonObject() {
+            return new ResponseFormat(ResponseFormatType.JSON_OBJECT, null, false, null);
+        }
+
+        public static ResponseFormat jsonSchema(String name, boolean strict, Map<String, Object> schema) {
+            return new ResponseFormat(ResponseFormatType.JSON_SCHEMA, name, strict, schema);
+        }
+    }
+
     @Getter
     @Builder
     @Jacksonized

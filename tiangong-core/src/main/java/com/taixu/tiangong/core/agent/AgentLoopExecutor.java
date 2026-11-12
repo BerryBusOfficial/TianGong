@@ -13,6 +13,7 @@ import com.taixu.tiangong.annotations.annotation.framework.agent.loop.entrance.L
 import com.taixu.tiangong.annotations.annotation.framework.agent.loop.entrance.ServiceEntranceNode;
 import com.taixu.tiangong.annotations.annotation.framework.agent.loop.entrance.ServiceExportNode;
 import com.taixu.tiangong.annotations.annotation.framework.agent.loop.entrance.StdinEntranceNode;
+import com.taixu.tiangong.common.agent.call.AgentCallContext;
 import com.taixu.tiangong.common.agent.context.AgentContext;
 import com.taixu.tiangong.common.sandbox.CommandLine;
 import com.taixu.tiangong.common.thread.VirtualThreads;
@@ -814,6 +815,7 @@ public class AgentLoopExecutor {
             final EntranceRequest fRequest = request;
             VirtualThreads.start(() -> {
                 CURRENT_REQUEST.set(fRequest);
+                AgentCallContext previousCallContext = AgentCallContext.bind(fRequest.callContext());
                 try {
                     C forkedContext = (C) context.copy();
                     forkedContext.bindWorkflow(workflowId);
@@ -843,6 +845,7 @@ public class AgentLoopExecutor {
                     }
                 } finally {
                     route.releaseConcurrency();
+                    AgentCallContext.restore(previousCallContext);
                     CURRENT_REQUEST.remove();
                 }
             });
@@ -931,6 +934,7 @@ public class AgentLoopExecutor {
             final EntranceRequest fRequest = request;
             VirtualThreads.start(() -> {
                 CURRENT_REQUEST.set(fRequest);
+                AgentCallContext previousCallContext = AgentCallContext.bind(fRequest.callContext());
                 try {
                     C forkedContext = (C) context.copy();
                     forkedContext.bindWorkflow(workflowId);
@@ -961,6 +965,7 @@ public class AgentLoopExecutor {
                     }
                 } finally {
                     fRoute.releaseConcurrency();
+                    AgentCallContext.restore(previousCallContext);
                     CURRENT_REQUEST.remove();
                 }
             });

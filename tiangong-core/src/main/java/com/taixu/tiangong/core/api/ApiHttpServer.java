@@ -3,6 +3,7 @@ package com.taixu.tiangong.core.api;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import lombok.extern.slf4j.Slf4j;
+import com.taixu.tiangong.common.agent.call.AgentCallContext;
 import com.taixu.tiangong.common.enums.RequestMethod;
 import com.taixu.tiangong.core.api.entrance.EntranceRequest;
 import com.taixu.tiangong.core.api.entrance.EntranceResponse;
@@ -126,14 +127,16 @@ public class ApiHttpServer implements AutoCloseable {
             String body = readBody(exchange);
 
             // 构造请求
+            Map<String, String> headers = extractHeaders(exchange);
             EntranceRequest request = new EntranceRequest(
                     exchange.getRequestMethod(),
                     path,
                     body,
-                    extractHeaders(exchange),
+                    headers,
                     queryParams,
                     null,
-                    new java.util.concurrent.CompletableFuture<>()
+                    new java.util.concurrent.CompletableFuture<>(),
+                    AgentCallContext.fromHeaders(headers)
             );
 
             // 投递到路由

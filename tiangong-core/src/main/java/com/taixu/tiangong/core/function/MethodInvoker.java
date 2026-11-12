@@ -1,6 +1,7 @@
 package com.taixu.tiangong.core.function;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.taixu.tiangong.common.agent.call.AgentCallContext;
 import com.taixu.tiangong.common.exception.SystemRuntimeException;
 import com.taixu.tiangong.common.util.ConvertUtil;
 import com.taixu.tiangong.common.util.JsonUtil;
@@ -36,9 +37,20 @@ public class MethodInvoker implements ToolInvoker {
 
     @Override
     public Object invoke(Map<String, Object> arguments) {
-        Object[] args = new Object[params.size()];
-        for (int i = 0; i < params.size(); i++) {
-            AgentFunctionDefinition.ParamDefinition def = params.get(i);
+        Object[] args = new Object[paramTypes.length];
+        int paramIndex = 0;
+        for (int i = 0; i < paramTypes.length; i++) {
+            // 调用者上下文由框架注入：不占 ParamDefinition、不从 arguments 取值。
+            // 它是请求身份，不是模型可伪造的业务参数。
+            if (paramTypes[i] == AgentCallContext.class) {
+                args[i] = AgentCallContext.current();
+                continue;
+            }
+            if (paramIndex >= params.size()) {
+                throw new IllegalStateException(
+                        "工具方法 [" + method.getName() + "] 的形参数量与工具参数定义不一致");
+            }
+            AgentFunctionDefinition.ParamDefinition def = params.get(paramIndex++);
             Object value = arguments.get(def.name());
             if (value == null && !def.required()) {
                 value = convertDefaultValue(def.defaultValue(), paramTypes[i], def.name());

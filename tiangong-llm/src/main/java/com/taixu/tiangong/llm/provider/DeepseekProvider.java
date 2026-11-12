@@ -26,6 +26,14 @@ public class DeepseekProvider implements LlmProvider<Deepseek> {
         // OpenAI 协议（含 DeepSeek 网关）校验 tool_choice 必须伴随 tools：无工具请求
         // （如 json 模式的结构化输出调用）带上它会被 400 拒绝，所以没有 tools 就不下发 tool_choice
         boolean hasTools = request.getTools() != null && !request.getTools().isEmpty();
+        // Deepseek 目前只认 json_object（不支持带 schema 的 json_schema）；
+        // 需要 schema 约束时由 StructuredOutputRunner 把 schema 注入提示词，框架侧再校验。
+        DeepseekChatRequest.ResponseFormat responseFormat = options.getResponseFormat();
+        ChatRequest.ResponseFormat structured = request.getResponseFormat();
+        if (structured != null && structured.type() != ChatRequest.ResponseFormatType.TEXT) {
+            responseFormat = new DeepseekChatRequest.ResponseFormat(
+                    DeepseekChatRequest.ResponseFormat.Format.JSON_OBJECT);
+        }
         return DeepseekChatRequest.builder()
                 .model(request.getModel())
                 .messages(request.getMessages())
@@ -38,7 +46,7 @@ public class DeepseekProvider implements LlmProvider<Deepseek> {
                 .stop(options.getStop())
                 .maxTokens(options.getMaxTokens())
                 .reasonEffort(options.getReasonEffort())
-                .responseFormat(options.getResponseFormat())
+                .responseFormat(responseFormat)
                 .topLogprobs(options.getTopLogprobs())
                 .streamOptions(options.getStreamOptions())
                 .userId(options.getUserId())

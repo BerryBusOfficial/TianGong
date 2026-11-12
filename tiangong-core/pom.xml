@@ -51,6 +51,16 @@
             <version>${project.parent.version}</version>
         </dependency>
         <dependency>
+            <groupId>com.taixu</groupId>
+            <artifactId>tiangong-protocol</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+        <!-- Optional<T> 结构化输出反序列化需要 Jdk8Module；findAndAddModules 才会注册它 -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jdk8</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.jgrapht</groupId>
             <artifactId>jgrapht-core</artifactId>
         </dependency>

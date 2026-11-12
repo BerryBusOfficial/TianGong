@@ -1,12 +1,17 @@
 package com.taixu.tiangong.llm.event.stream;
 
 import lombok.extern.slf4j.Slf4j;
+import com.taixu.tiangong.common.agent.call.AgentCallContext;
 import com.taixu.tiangong.common.thread.VirtualThreads;
+import com.taixu.tiangong.llm.api.response.chat.chunk.ChatChunkResponse;
+import com.taixu.tiangong.protocol.event.AgentEvent;
+import com.taixu.tiangong.protocol.event.AgentEventScope;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -42,6 +47,10 @@ public class ToolLoopChatStream<T, TCall> implements ChatStream<T, TCall> {
     private final ChatStream<T, TCall> first;
     private final ToolLoop loop;
     private final Function<TCall, ToolCall> extractor;
+    private final Function<T, String> deltaExtractor;
+    private final AgentEventScope.Binding eventBinding;
+    private final AgentCallContext.Binding callBinding;
+    private final AtomicBoolean terminalEmitted = new AtomicBoolean();
 
     private final List<Consumer<? super T>> dataConsumers = new CopyOnWriteArrayList<>();
     private final List<Consumer<? super String>> reasoningConsumers = new CopyOnWriteArrayList<>();
@@ -62,9 +71,23 @@ public class ToolLoopChatStream<T, TCall> implements ChatStream<T, TCall> {
     private volatile ChatStream<T, TCall> active;
 
     ToolLoopChatStream(ChatStream<T, TCall> first, ToolLoop loop, Function<TCall, ToolCall> extractor) {
+        this(first, loop, extractor, null, null, null);
+    }
+
+    ToolLoopChatStream(ChatStream<T, TCall> first, ToolLoop loop, Function<TCall, ToolCall> extractor,
+                       Function<T, String> deltaExtractor, AgentEventScope.Binding eventBinding) {
+        this(first, loop, extractor, deltaExtractor, eventBinding, null);
+    }
+
+    ToolLoopChatStream(ChatStream<T, TCall> first, ToolLoop loop, Function<TCall, ToolCall> extractor,
+                       Function<T, String> deltaExtractor, AgentEventScope.Binding eventBinding,
+                       AgentCallContext.Binding callBinding) {
         this.first = first;
         this.loop = loop;
         this.extractor = extractor;
+        this.deltaExtractor = deltaExtractor;
+        this.eventBinding = eventBinding;
+        this.callBinding = callBinding;
         this.active = first;
     }
 
@@ -145,11 +168,40 @@ public class ToolLoopChatStream<T, TCall> implements ChatStream<T, TCall> {
     }
 
     private void run() {
+        // 事件绑定在创建流时捕获；读取发生在本虚拟线程里，ThreadLocal 不会自动继承，
+        // 所以这里显式恢复作用域，工具循环里的 FunctionToolLoop 才能发 tool 事件。
+        Runnable body = eventBinding == null
+                ? this::runLoop
+                : () -> AgentEventScope.runWith(eventBinding, this::runLoop);
+        // 调用者身份必须一起搬运：工具执行发生在读流线程里，
+        // 不绑定的话 FunctionToolLoop 看到的 AgentCallContext 是 null，
+        // 带 scope 的工具会被误判为「无权限」。
+        if (callBinding == null || callBinding.context() == null) {
+            body.run();
+        } else {
+            callBinding.run(body);
+        }
+    }
+
+    private void runLoop() {
         ChatStream<T, TCall> current = first;
         ChatAggregateResult<TCall> last = null;
         try {
             for (int round = 1; !cancelled; round++) {
                 // 实时回调转发到本轮流：先注册再启动，保证不丢头部 chunk
+                if (eventBinding != null) {
+                    current.onData(chunk -> {
+                        String delta = extractDelta(chunk);
+                        if (delta != null && !delta.isEmpty()) {
+                            AgentEventScope.emit(eventBinding, new AgentEvent.MessageDelta(delta));
+                        }
+                    });
+                    current.onReasoning(text -> {
+                        if (text != null && !text.isEmpty()) {
+                            AgentEventScope.emit(eventBinding, new AgentEvent.ReasoningDelta(text));
+                        }
+                    });
+                }
                 dataConsumers.forEach(current::onData);
                 reasoningConsumers.forEach(current::onReasoning);
                 current.start().await();                            // 本轮读完；异常走 catch
@@ -212,14 +264,52 @@ public class ToolLoopChatStream<T, TCall> implements ChatStream<T, TCall> {
                 !cancelled && (last == null || last.success())
         );
         finishConsumers.forEach(consumer -> consumer.accept(aggregate));
+        emitUsage(aggregate);
+        emitTerminal(cancelled ? "cancelled" : "completed");
         resultFuture.complete(aggregate);
         future.complete(null);
     }
 
     private void fail(Throwable t) {
+        if (terminalEmitted.compareAndSet(false, true)) {
+            String message = t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage();
+            AgentEventScope.emit(eventBinding, new AgentEvent.Error("llm_stream_error", message, false));
+            AgentEventScope.emit(eventBinding, new AgentEvent.Done("failed"));
+        }
         collectFuture.completeExceptionally(t);
         resultFuture.completeExceptionally(t);
         errorConsumers.forEach(consumer -> consumer.accept(t));
         future.completeExceptionally(t);
+    }
+
+    private String extractDelta(T chunk) {
+        if (chunk == null) {
+            return null;
+        }
+        if (deltaExtractor != null) {
+            return deltaExtractor.apply(chunk);
+        }
+        if (chunk instanceof ChatChunkResponse<?> response) {
+            return response.getContent();
+        }
+        return null;
+    }
+
+    private void emitUsage(ChatAggregateResult<TCall> aggregate) {
+        if (eventBinding == null || aggregate == null || aggregate.usage() == null) {
+            return;
+        }
+        ChatAggregateResult.TokenUsage usage = aggregate.usage();
+        if (usage.totalTokens() <= 0 && usage.promptTokens() <= 0 && usage.completionTokens() <= 0) {
+            return;
+        }
+        AgentEventScope.emit(eventBinding, new AgentEvent.Usage(
+                usage.promptTokens(), usage.completionTokens(), usage.totalTokens(), null));
+    }
+
+    private void emitTerminal(String status) {
+        if (terminalEmitted.compareAndSet(false, true)) {
+            AgentEventScope.emit(eventBinding, new AgentEvent.Done(status));
+        }
     }
 }

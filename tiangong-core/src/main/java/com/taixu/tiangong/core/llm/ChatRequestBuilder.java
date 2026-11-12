@@ -29,6 +29,25 @@ public sealed interface ChatRequestBuilder permits DefaultChatRequestBuilder {
 
     ChatRequest build(List<Message> messages, Boolean stream, String... toolFunctions);
 
+    /**
+     * 结构化输出：把目标类型的 JSON Schema 作为 provider 无关约束带上。
+     */
+    ChatRequest build(List<Message> messages, StructuredOutput output);
+
+    ChatRequest build(List<Message> messages, Boolean stream, ToolParam toolParam, StructuredOutput output);
+
+    /**
+     * 便捷入口：由类型直接生成 schema，避免调用方每次手写 {@code StructuredOutput.of(...)}。
+     */
+    default ChatRequest buildStructured(List<Message> messages, Class<?> outputType) {
+        return build(messages, StructuredOutput.of(outputType));
+    }
+
+    default ChatRequest buildStructured(List<Message> messages, Boolean stream,
+                                        ToolParam toolParam, Class<?> outputType) {
+        return build(messages, stream, toolParam, StructuredOutput.of(outputType));
+    }
+
     enum ToolParam {
         ALL,
         NONE

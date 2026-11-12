@@ -29,6 +29,7 @@ public class OpenaiProvider implements LlmProvider<Openai> {
         }
         // 同 DeepseekProvider：tool_choice 必须伴随 tools 下发，无工具请求不能带（网关 400）
         boolean hasTools = request.getTools() != null && !request.getTools().isEmpty();
+        OpenaiChatRequest.ResponseFormat responseFormat = toResponseFormat(request.getResponseFormat(), options);
         return OpenaiChatRequest.builder()
                 .model(request.getModel())
                 .messages(request.getMessages())
@@ -43,7 +44,7 @@ public class OpenaiProvider implements LlmProvider<Openai> {
                 .maxCompletionTokens(options.getMaxCompletionTokens())
                 .maxTokens(options.getMaxTokens())
                 .stop(options.getStop())
-                .responseFormat(options.getResponseFormat())
+                .responseFormat(responseFormat)
                 .streamOptions(options.getStreamOptions())
                 .parallelToolCalls(options.getParallelToolCalls())
                 .store(options.getStore())
@@ -57,6 +58,27 @@ public class OpenaiProvider implements LlmProvider<Openai> {
     @Override
     public Request<? extends Embedding> toEmbeddingRequest(EmbeddingRequest request) {
         return null;
+    }
+
+    /**
+     * provider 无关的结构化输出约束 → OpenAI 的 {@code response_format}。<br>
+     * 没有显式约束时沿用配置里的值（既有 json 模式配置不丢）。
+     */
+    private static OpenaiChatRequest.ResponseFormat toResponseFormat(
+            ChatRequest.ResponseFormat structured, OpenaiChatOptions options) {
+        if (structured == null) {
+            return options.getResponseFormat();
+        }
+        return switch (structured.type()) {
+            case TEXT -> new OpenaiChatRequest.ResponseFormat(
+                    OpenaiChatRequest.ResponseFormat.Format.TEXT, null);
+            case JSON_OBJECT -> new OpenaiChatRequest.ResponseFormat(
+                    OpenaiChatRequest.ResponseFormat.Format.JSON_OBJECT, null);
+            case JSON_SCHEMA -> new OpenaiChatRequest.ResponseFormat(
+                    OpenaiChatRequest.ResponseFormat.Format.JSON_SCHEMA,
+                    new OpenaiChatRequest.ResponseFormat.JsonSchema(
+                            structured.name(), structured.strict(), structured.schema()));
+        };
     }
 
     @Override

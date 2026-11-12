@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.taixu</groupId>
+        <artifactId>tiangong</artifactId>
+        <version>0.0.1</version>
+    </parent>
+
+    <artifactId>tiangong-protocol</artifactId>
+
+    <name>TianGong Agent Protocol</name>
+    <description>
+        类型化 Agent 流式事件协议：message.delta / reasoning.delta / tool.call / tool.result /
+        citation / artifact / usage / structured / error / done，含序号、断点续传与客户端 SDK。
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.taixu</groupId>
+            <artifactId>tiangong-common</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+        <!-- 事件协议对外是 JSON 契约，显式依赖 databind，不靠 yaml 模块的传递依赖 -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+    </dependencies>
+
+</project>

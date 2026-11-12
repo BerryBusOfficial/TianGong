@@ -7,6 +7,7 @@ import com.taixu.tiangong.llm.api.response.chat.OllamaChatResponse;
 import com.taixu.tiangong.llm.client.OllamaLlmClient;
 import com.taixu.tiangong.llm.entity.Option;
 import com.taixu.tiangong.llm.event.result.OllamaChatResult;
+import com.taixu.tiangong.llm.event.stream.ChatStream;
 import com.taixu.tiangong.llm.event.stream.OllamaChatStream;
 import com.taixu.tiangong.llm.message.AssistantMessage;
 import com.taixu.tiangong.llm.message.HumanMessage;
@@ -47,7 +48,7 @@ class LlmIntegrationTest {
 
     @Test
     void streamChatReturnsData() {
-        OllamaChatStream stream = client.stream(ChatRequest.builder()
+        ChatStream<OllamaChatResponse, OllamaChatResponse.ToolCall> stream = client.stream(ChatRequest.builder()
                 .model(MODEL)
                 .messages(List.of(new HumanMessage("说一个数字")))
                 .stream(true)

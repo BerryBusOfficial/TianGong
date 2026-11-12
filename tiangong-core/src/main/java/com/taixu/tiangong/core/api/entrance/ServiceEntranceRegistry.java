@@ -1,6 +1,7 @@
 package com.taixu.tiangong.core.api.entrance;
 
 import lombok.extern.slf4j.Slf4j;
+import com.taixu.tiangong.common.agent.call.AgentCallContext;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -150,7 +151,7 @@ public class ServiceEntranceRegistry {
      */
     public CompletableFuture<EntranceResponse> submit(String url, String workflow, String body) {
         ServiceEntranceRoute route = resolve(url, workflow);
-        EntranceRequest request = EntranceRequest.post(url, body);
+        EntranceRequest request = EntranceRequest.post(url, body, AgentCallContext.current());
         if (!route.submit(request)) {
             throw new ServiceEntranceException(
                     "服务入口已关闭: [" + url + "]（工作流 " + route.workflowId() + "）");

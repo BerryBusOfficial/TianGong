@@ -5,6 +5,7 @@ import lombok.Getter;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Agent 工具函数注册项：元数据 + 统一调用执行器。<br>
@@ -20,6 +21,10 @@ public class AgentFunctionDefinition {
     private final Method method;          // 本地函数方法（MCP 为 null）
     private final List<ParamDefinition> params;
     private final ToolInvoker invoker;    // 统一调用执行器
+    /** 调用该工具所需的 scope；空集合 = 无需额外权限（兼容既有工具） */
+    private final Set<String> scopes;
+    /** 是否必须审批；没有审批处理器时按拒绝处理 */
+    private final boolean requiresApproval;
     /**
      * 原始 JSON Schema —— <b>只有外部工具（MCP）会带</b>，本地函数恒为 null。<br>
      * <br>
@@ -46,7 +51,22 @@ public class AgentFunctionDefinition {
 
     public AgentFunctionDefinition(String name, String beanName, String description,
                                    Object target, Method method, List<ParamDefinition> params,
+                                   Set<String> scopes, boolean requiresApproval) {
+        this(name, beanName, description, target, method, params, null,
+                target != null && method != null ? new MethodInvoker(target, method, params) : null,
+                scopes, requiresApproval);
+    }
+
+    public AgentFunctionDefinition(String name, String beanName, String description,
+                                   Object target, Method method, List<ParamDefinition> params,
                                    Map<String, Object> rawSchema, ToolInvoker invoker) {
+        this(name, beanName, description, target, method, params, rawSchema, invoker, Set.of(), false);
+    }
+
+    public AgentFunctionDefinition(String name, String beanName, String description,
+                                   Object target, Method method, List<ParamDefinition> params,
+                                   Map<String, Object> rawSchema, ToolInvoker invoker,
+                                   Set<String> scopes, boolean requiresApproval) {
         this.name = name;
         this.beanName = beanName;
         this.description = description;
@@ -55,6 +75,8 @@ public class AgentFunctionDefinition {
         this.params = params;
         this.rawSchema = rawSchema;
         this.invoker = invoker;
+        this.scopes = scopes == null ? Set.of() : Set.copyOf(scopes);
+        this.requiresApproval = requiresApproval;
     }
 
     /**

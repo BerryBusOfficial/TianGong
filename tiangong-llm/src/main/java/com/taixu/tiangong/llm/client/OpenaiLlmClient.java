@@ -102,7 +102,8 @@ public class OpenaiLlmClient implements LlmClient<Openai, OpenaiProvider> {
             map.put("stream_options", Map.of("include_usage", true));
         }
         InputStream stream = getApi().chatCompletionStream(map);
-        return ToolLoopSupport.wrap(new OpenaiChatStream(stream), chatRequest, this, OpenaiLlmClient::toToolCall);
+        return ToolLoopSupport.wrap(new OpenaiChatStream(stream), chatRequest, this,
+                OpenaiLlmClient::toToolCall, OpenaiChatChunkResponse::getContent);
     }
 
     /** 协议侧分片调用 → 循环层的中立形态；传入的已是流结束时的完整快照（arguments 拼好了） */

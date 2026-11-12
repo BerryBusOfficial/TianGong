@@ -6,6 +6,8 @@ import com.taixu.tiangong.common.function.Arguments;
 import com.taixu.tiangong.common.util.JsonUtil;
 import com.taixu.tiangong.core.function.AgentFunctionDefinition;
 import com.taixu.tiangong.core.function.FunctionRegistry;
+import com.taixu.tiangong.core.function.ToolAccessDeniedException;
+import com.taixu.tiangong.core.function.ToolGovernance;
 import com.taixu.tiangong.llm.api.request.chat.ChatRequest;
 import com.taixu.tiangong.llm.client.LlmClient;
 import com.taixu.tiangong.llm.event.stream.ChatStream;
@@ -14,6 +16,8 @@ import com.taixu.tiangong.llm.event.stream.ToolLoop;
 import com.taixu.tiangong.llm.factory.MessageFactory;
 import com.taixu.tiangong.llm.message.AssistantMessage;
 import com.taixu.tiangong.llm.message.Message;
+import com.taixu.tiangong.protocol.event.AgentEvent;
+import com.taixu.tiangong.protocol.event.AgentEventScope;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -66,20 +70,40 @@ public class FunctionToolLoop implements ToolLoop {
      * 执行一个工具调用；一切失败都进结果文本（见类注释的失败策略）。
      */
     private String execute(ToolCall call) {
+        AgentEventScope.emit(new AgentEvent.ToolCall(call.id(), call.name(), call.arguments()));
+        long startNanos = System.nanoTime();
+
         AgentFunctionDefinition definition = functions.get(call.name()).orElse(null);
         if (definition == null) {
+            String text = "工具未注册: " + call.name();
             log.warn("模型调用了未注册的工具 [{}]，已作为错误结果回放（检查 @AgentFunction 是否被扫描到）", call.name());
-            return "工具未注册: " + call.name();
+            emitToolResult(call, "failed", text, startNanos);
+            return text;
         }
         try {
-            Object result = definition.invoke(Arguments.fromJson(call.arguments()).asMap());
+            Object result = ToolGovernance.invoke(
+                    definition, Arguments.fromJson(call.arguments()).asMap(), call.name());
             String text = toResultText(result);
             log.info("工具调用 [{}] {} -> {}", call.name(), call.arguments(), abbreviate(text));
+            emitToolResult(call, "success", text, startNanos);
+            return text;
+        } catch (ToolAccessDeniedException e) {
+            String text = "工具调用被拒绝: " + e.getMessage();
+            log.warn("工具 [{}] 被权限/审批策略拒绝: {}", call.name(), e.getMessage());
+            emitToolResult(call, "denied", text, startNanos);
             return text;
         } catch (Exception e) {
+            String text = "工具执行失败: " + e.getMessage();
             log.warn("工具 [{}] 执行失败: {}", call.name(), e.getMessage(), e);
-            return "工具执行失败: " + e.getMessage();
+            emitToolResult(call, "failed", text, startNanos);
+            return text;
         }
+    }
+
+    private void emitToolResult(ToolCall call, String status, String result, long startNanos) {
+        AgentEventScope.emit(new AgentEvent.ToolResult(
+                call.id(), call.name(), status, result,
+                (System.nanoTime() - startNanos) / 1_000_000));
     }
 
     /**

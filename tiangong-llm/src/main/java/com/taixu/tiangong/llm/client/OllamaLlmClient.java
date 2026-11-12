@@ -2,6 +2,7 @@ package com.taixu.tiangong.llm.client;
 
 import com.taixu.tiangong.common.type.Model;
 import com.taixu.tiangong.common.type.impl.Ollama;
+import com.taixu.tiangong.common.util.JsonUtil;
 import com.taixu.tiangong.llm.api.Api;
 import com.taixu.tiangong.llm.api.OllamaApi;
 import com.taixu.tiangong.llm.api.request.Request;
@@ -9,10 +10,14 @@ import com.taixu.tiangong.llm.api.request.chat.ChatRequest;
 import com.taixu.tiangong.llm.api.request.chat.OllamaChatRequest;
 import com.taixu.tiangong.llm.api.request.embedding.EmbeddingRequest;
 import com.taixu.tiangong.llm.api.request.embedding.OllamaEmbeddingRequest;
+import com.taixu.tiangong.llm.api.response.chat.OllamaChatResponse;
 import com.taixu.tiangong.llm.api.response.embed.OllamaEmbeddingResponse;
 import com.taixu.tiangong.llm.api.response.model.OllamaModelsResponse;
 import com.taixu.tiangong.llm.event.result.OllamaChatResult;
+import com.taixu.tiangong.llm.event.stream.ChatStream;
 import com.taixu.tiangong.llm.event.stream.OllamaChatStream;
+import com.taixu.tiangong.llm.event.stream.ToolCall;
+import com.taixu.tiangong.llm.event.stream.ToolLoopSupport;
 import com.taixu.tiangong.llm.provider.OllamaProvider;
 
 import java.io.InputStream;
@@ -64,14 +69,32 @@ public class OllamaLlmClient implements LlmClient<Ollama, OllamaProvider> {
     }
 
     @Override
-    public OllamaChatStream stream(ChatRequest request) {
+    public ChatStream<OllamaChatResponse, OllamaChatResponse.ToolCall> stream(ChatRequest request) {
         OllamaChatRequest body = getProvider().toChatRequest(request);
         Map<String, Object> map = body.toMap();
         if (body.getStream() == null || body.getStream().equals(Boolean.FALSE)) {
             map.put("stream", true);
         }
         InputStream stream = getApi().chatCompletionStream(map);
-        return new OllamaChatStream(stream);
+        return ToolLoopSupport.wrap(new OllamaChatStream(stream), request, this,
+                OllamaLlmClient::toToolCall, OllamaChatResponse::getContent);
+    }
+
+    /**
+     * Ollama 的工具调用参数是结构化对象（不像 OpenAI 是 JSON 文本），
+     * 这里统一序列化成 JSON 文本，循环层与 Openai/Deepseek 走同一条回放路径。
+     */
+    private static ToolCall toToolCall(OllamaChatResponse.ToolCall call) {
+        var function = call.function();
+        String arguments;
+        try {
+            arguments = function == null || function.arguments() == null
+                    ? "{}"
+                    : JsonUtil.toJson(function.arguments());
+        } catch (Exception e) {
+            arguments = "{}";
+        }
+        return new ToolCall(call.id(), function == null ? null : function.name(), arguments);
     }
 
     @Override

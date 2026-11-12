@@ -22,6 +22,11 @@
         </dependency>
         <dependency>
             <groupId>com.taixu</groupId>
+            <artifactId>tiangong-protocol</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.taixu</groupId>
             <artifactId>annotations-annotation</artifactId>
             <version>${project.parent.version}</version>
             <scope>compile</scope>

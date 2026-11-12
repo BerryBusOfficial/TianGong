@@ -86,7 +86,8 @@ public class DeepseekLlmClient implements LlmClient<Deepseek, DeepseekProvider> 
             map.put("stream", true);
         }
         InputStream stream = getApi().chatCompletionStream(map);
-        return ToolLoopSupport.wrap(new DeepseekChatStream(stream), chatRequest, this, DeepseekLlmClient::toToolCall);
+        return ToolLoopSupport.wrap(new DeepseekChatStream(stream), chatRequest, this,
+                DeepseekLlmClient::toToolCall, DeepseekChatChunkResponse::getContent);
     }
 
     /** 协议侧分片调用 → 循环层的中立形态；传入的已是流结束时的完整快照（arguments 拼好了） */
