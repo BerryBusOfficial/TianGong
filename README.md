@@ -46,7 +46,7 @@ mvn -DskipTests package
 
 完整用法与边界见 [docs/agent-integration.md](docs/agent-integration.md)。
 
-## 第二轮 P1（进行中）
+## 第二轮 P1（已完成，2026-11-12）
 
 * **检索/记忆 SPI**：`Retriever` 只负责召回；`RetrievalService` 统一做 ACL（scope + tenant）、
   排序截断、citation 事件与 `toPromptBlock`。换向量库/图扩散不改业务。
@@ -64,6 +64,54 @@ mvn -DskipTests package
   自动启动上下文并注入依赖；`WorkflowGraphSnapshot` 输出稳定的节点/边/START/REPLAY 快照，
   `assertMatches` 与 golden 文件比对，图结构漂移会直接失败。
 
+## Maven Central
+
+坐标（groupId 为 `io.github.berrybus-official`，版本 `0.0.1`）：
+
+```xml
+<dependency>
+    <groupId>io.github.berrybus-official</groupId>
+    <artifactId>tiangong-core</artifactId>
+    <version>0.0.1</version>
+</dependency>
+```
+
+常用模块：`tiangong-common`、`tiangong-protocol`、`tiangong-llm`、`tiangong-retrieval`、
+`tiangong-trace`、`tiangong-core`、`tiangong-mcp`、`tiangong-skill`、`tiangong-spring`；
+版本统一由 `tiangong-bom` 管理：
+
+```xml
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>io.github.berrybus-official</groupId>
+            <artifactId>tiangong-bom</artifactId>
+            <version>0.0.1</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+```
+
+发布前准备：
+
+* 在 Central Portal 获取 token，写入 `~/.m2/settings.xml` 的 `central` server；
+* 准备 GPG key，并让 `gpg` 可用（可用 `gpg.passphrase` 或 agent）；
+* 确认 GitHub 账号 `berrybus-official` 拥有 `io.github.berrybus-official` 命名空间。
+
+```bash
+# 正常构建不会签名/发布
+mvn clean test
+
+# 发布：sources + javadoc + GPG + Central Portal bundle（autoPublish=false）
+mvn -Pcentral-publish clean deploy
+```
+
+`central-publish` profile 只在这个命令下生效；发布后在 Central Portal 手动确认（或将
+`autoPublish` 改为 `true`）。父 POM 已改为独立根 POM，不再依赖外部 `taixu-parent` 的
+`1.0-SNAPSHOT`。
+
 ## 设计原则
 
 * **状态与身份分离**：`AgentContext` 是可检查点的工作流状态；`AgentCallContext` 是请求身份，
@@ -72,6 +120,6 @@ mvn -DskipTests package
 * **失败默认拒绝**：审批处理器缺失/异常按拒绝处理；工具执行失败把原因回放给模型，不炸整条流。
 * **协议层不依赖宿主**：事件协议/SSE 不依赖 `@ApiEntranceNode`，可挂到任意 HTTP 端口。
 
-## 协议
+## 开源协议
 
-个人自研生态项目，暂不公开授权，保留所有权利。
+本项目采用 [Apache License 2.0](LICENSE)。

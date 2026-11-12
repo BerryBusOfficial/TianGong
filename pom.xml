@@ -3,20 +3,65 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <parent>
-        <groupId>com.taixu</groupId>
-        <artifactId>taixu-parent</artifactId>
-        <version>1.0-SNAPSHOT</version>
-    </parent>
 
+    <groupId>io.github.berrybus-official</groupId>
     <artifactId>tiangong</artifactId>
     <version>0.0.1</version>
     <packaging>pom</packaging>
 
-    <name>太虚·天工（TianGong / CraftEngine)</name>
+    <name>TianGong Agent Framework</name>
     <description>
-        （待优化描述）
+        TianGong (CraftEngine): annotation-driven agent workflow orchestration, a lightweight IoC
+        container, multi-provider LLM streaming, typed agent events, retrieval/ACL, model routing,
+        trace and replay.
     </description>
+    <url>https://github.com/BerryBusOfficial/TianGong</url>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>Wu-Xi-Cheng</id>
+            <name>Wu-Xi-Cheng</name>
+            <email>mcht1023@gmail.com</email>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:https://github.com/BerryBusOfficial/TianGong.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/BerryBusOfficial/TianGong.git</developerConnection>
+        <url>https://github.com/BerryBusOfficial/TianGong</url>
+        <tag>HEAD</tag>
+    </scm>
+
+    <issueManagement>
+        <system>GitHub Issues</system>
+        <url>https://github.com/BerryBusOfficial/TianGong/issues</url>
+    </issueManagement>
+
+    <distributionManagement>
+        <repository>
+            <id>central</id>
+            <url>https://central.sonatype.com/api/v1/publisher</url>
+        </repository>
+    </distributionManagement>
+
+    <properties>
+        <java.version>21</java.version>
+        <maven.compiler.release>${java.version}</maven.compiler.release>
+        <!-- Keep method parameter names for framework reflection/annotation processing. -->
+        <maven.compiler.parameters>true</maven.compiler.parameters>
+        <spring-boot.version>4.1.1</spring-boot.version>
+        <mybatis-plus.version>3.5.17</mybatis-plus.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    </properties>
 
     <modules>
         <module>tiangong-core</module>
@@ -44,7 +89,7 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>com.taixu</groupId>
+                <groupId>io.github.berrybus-official</groupId>
                 <artifactId>tiangong-bom</artifactId>
                 <version>${project.version}</version>
                 <type>pom</type>
@@ -88,17 +133,123 @@
     </dependencies>
 
     <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.13.0</version>
+                    <configuration>
+                        <!-- Explicit full annotation processing: Lombok + TianGong processor. -->
+                        <proc>full</proc>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>3.2.5</version>
+                    <configuration>
+                        <useModulePath>false</useModulePath>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+
         <plugins>
-            <!-- 编译参数（release/编码/注解处理）由 taixu-parent 统一管理；此处仅保留天工自有配置 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.2.5</version>
-                <configuration>
-                    <useModulePath>false</useModulePath>
-                </configuration>
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!--
+            Maven Central release profile. No release plugin runs during normal builds;
+            activate explicitly with:
+                mvn -Pcentral-publish clean deploy
+            Required local setup:
+              * ~/.m2/settings.xml server id "central" with Central Portal token credentials
+              * a GPG key + gpg.passphrase (or GPG agent)
+        -->
+        <profile>
+            <id>central-publish</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>3.3.1</version>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>3.10.1</version>
+                        <configuration>
+                            <doclint>none</doclint>
+                            <failOnError>false</failOnError>
+                            <failOnWarnings>false</failOnWarnings>
+                            <quiet>true</quiet>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>3.2.7</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <gpgArguments>
+                                <arg>--pinentry-mode</arg>
+                                <arg>loopback</arg>
+                            </gpgArguments>
+                        </configuration>
+                    </plugin>
+
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.7.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central</publishingServerId>
+                            <tokenAuth>true</tokenAuth>
+                            <autoPublish>false</autoPublish>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

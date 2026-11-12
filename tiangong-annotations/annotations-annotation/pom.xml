@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <groupId>com.taixu</groupId>
+        <groupId>io.github.berrybus-official</groupId>
         <artifactId>tiangong-annotations</artifactId>
         <version>0.0.1</version>
     </parent>
@@ -15,7 +15,7 @@
     <description>注解定义：@AgentComponent/@Inject 族/@Enable*/@FrameworkEnable 等框架注解</description>
     <dependencies>
         <dependency>
-            <groupId>com.taixu</groupId>
+            <groupId>io.github.berrybus-official</groupId>
             <artifactId>tiangong-common</artifactId>
             <version>0.0.1</version>
             <scope>compile</scope>

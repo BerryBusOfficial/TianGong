@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <groupId>com.taixu</groupId>
+        <groupId>io.github.berrybus-official</groupId>
         <artifactId>tiangong</artifactId>
         <version>0.0.1</version>
     </parent>
@@ -16,23 +16,23 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.taixu</groupId>
+            <groupId>io.github.berrybus-official</groupId>
             <artifactId>tiangong-common</artifactId>
             <version>${project.parent.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.taixu</groupId>
+            <groupId>io.github.berrybus-official</groupId>
             <artifactId>tiangong-protocol</artifactId>
             <version>${project.parent.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.taixu</groupId>
+            <groupId>io.github.berrybus-official</groupId>
             <artifactId>annotations-annotation</artifactId>
             <version>${project.parent.version}</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
-            <groupId>com.taixu</groupId>
+            <groupId>io.github.berrybus-official</groupId>
             <artifactId>annotations-processor</artifactId>
             <version>${project.parent.version}</version>
             <scope>compile</scope>

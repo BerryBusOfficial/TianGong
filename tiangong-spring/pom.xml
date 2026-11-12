@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.taixu</groupId>
+        <groupId>io.github.berrybus-official</groupId>
         <artifactId>tiangong</artifactId>
         <version>0.0.1</version>
     </parent>
@@ -33,7 +33,7 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.taixu</groupId>
+            <groupId>io.github.berrybus-official</groupId>
             <artifactId>tiangong-core</artifactId>
             <version>${project.version}</version>
         </dependency>
