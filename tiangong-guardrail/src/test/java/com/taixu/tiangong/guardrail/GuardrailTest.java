@@ -59,6 +59,16 @@ class GuardrailTest {
     }
 
     @Test
+    void outputSentinelIsRemoved() {
+        GuardrailResult result = new OutputSentinelGuardrail().inspect(GuardrailContext.of(
+                GuardrailStage.MODEL_OUTPUT, "done <<<REPORT_DRAFT>>> and <|endoftext|>", null));
+        assertEquals(GuardrailDecision.REDACT, result.decision());
+        assertFalse(result.text().contains("<<<REPORT_DRAFT>>>"));
+        assertFalse(result.text().contains("<|endoftext|>"));
+        assertTrue(result.text().contains("[sentinel-filtered]"));
+    }
+
+    @Test
     void chainFailsClosedWhenGuardThrows() {
         Guardrail broken = new Guardrail() {
             @Override

@@ -223,12 +223,13 @@ session.assertExhausted();
   跨进程/多实例的强一致扣减未做。
 * `TraceRecorder` 提供 golden trace 校验回放；工作流级「从失败点继续执行」仍依赖检查点，
   trace 不还原上下文。`TextRedactor` 是规则脱敏，不是完备 DLP；敏感数据不应进入 trace。
-* 指令注入/输出过滤/租户隔离已进入 P2 第一刀（见下）；剩余：工具超时/重试/熔断、
-  并行工具、客户端断连取消上游调用。
+* 指令注入/输出过滤/租户隔离、HITL、工具超时/重试/熔断、并行工具与断连取消已进入 P2。
+  剩余：工具幂等键、跨进程限流/审批、普通流式正文的逐 delta 输出护栏、完整工作流级
+  断连取消（当前取消的是上游 LLM 流与工具运行时）。
 * `ToolGovernance` 的审批/审计仍是进程级配置；租户级工具 scope 已支持，租户级审批策略
   仍需按租户替换 `ToolApprovalHandler`（P2 剩余）。
 
-## 8. P2 第一刀：护栏、租户策略、HITL
+## 8. P2：护栏、租户策略、HITL 与工具运行时
 
 - **护栏 SPI**（`tiangong-guardrail`）：`GuardrailStage`（INPUT / TOOL_OUTPUT / MODEL_OUTPUT）、
   `Guardrail`、`GuardrailChain`、`GuardrailService`。链内前一个改写结果作为后一个输入，
@@ -237,7 +238,9 @@ session.assertExhausted();
   - `PiiGuardrail`：邮箱、手机号、身份证、`sk-` / `github_pat_` / `ghp_` 令牌脱敏；
   - `PromptInjectionGuardrail`：常见「忽略之前指令 / 泄露系统提示 / 开发者模式」句式；
     INPUT 阶段 BLOCK，工具/模型输出阶段 REDACT；
-  - `UntrustedContentGuardrail`：工具输出加 `<untrusted-tool-output>` 边界与「不可信数据」声明。
+  - `UntrustedContentGuardrail`：工具输出加 `<untrusted-tool-output>` 边界与「不可信数据」声明；
+  - `OutputSentinelGuardrail`：模型输出里的内部哨兵（`<<<...>>>` / `<|...|>`）替换为
+    `[sentinel-filtered]`。
 - **接入点**：
   - `DefaultChatRequestBuilder` 对 `HumanMessage` 走 INPUT 护栏，BLOCK 抛
     `GuardrailBlockedException`，REDACT 重建消息；
@@ -247,6 +250,19 @@ session.assertExhausted();
   `ToolAccessPolicy` 先过租户 scope 再过调用者 scope；`ToolScope` 的 `:` 与 `.` 分隔符等价。
 - **工具结果上限**：`ToolResultLimiter` 默认 32k 字符，超出截断并附
   `omitted/total` 摘要；在护栏前处理，避免超长结果拖垮模型/日志。
+- **工具运行时**：`ToolRuntimePolicy` 提供超时（默认 60s）、重试（默认 1 次，不静默重试
+  可能带副作用的工具）与按工具熔断（失败阈值 / 冷却 / half-open 探针）；超时用虚拟线程
+  Future 实现，不能强杀忽略中断的工具。
+- **租户限流**：`TenantRateLimiter` 令牌桶按租户隔离，`ToolGovernance` 在执行前扣减；
+  单进程一致，多实例需 Redis/网关级限流。
+- **并行工具**：`FunctionToolLoop` 对同一轮多个 tool call 并发执行，结果按原始调用顺序回放；
+  工具作者需保证线程安全。
+- **断连取消**：`AgentEventJournal.onCancel` 由 `ToolLoopSupport` / 流式路由绑定到
+  `ChatStream.cancel`；`ToolLoopChatStream.cancel` 还会中断 runner，让正在等待的工具
+  Future 尽快退出。
+- **HITL HTTP**：`HumanApprovalHttpServer` 暴露
+  `GET /approvals`、`GET /approvals/{id}`、`POST /approvals/{id}/approve|reject`，
+  必须配置 bearer token；pending 仍是内存态。
 - **HITL**：`HumanApprovalService` 实现 `ToolApprovalHandler`，创建 pending ticket 并阻塞等待；
   审批 UI/IM/HTTP 端点通过 `pending()/approve()/reject()` 决定；超时/中断/关闭一律拒绝。
   pending 在内存，跨实例需落库与共享事件总线。

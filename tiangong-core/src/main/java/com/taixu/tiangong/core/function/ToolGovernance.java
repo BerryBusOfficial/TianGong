@@ -8,6 +8,7 @@ import com.taixu.tiangong.common.agent.tool.ToolAuditEvent;
 import com.taixu.tiangong.common.agent.tool.ToolAuditSink;
 import com.taixu.tiangong.common.agent.tool.ToolAuditStatus;
 import com.taixu.tiangong.common.util.JsonUtil;
+import com.taixu.tiangong.protocol.event.AgentEventScope;
 
 import java.time.Instant;
 import java.util.Map;
@@ -32,6 +33,8 @@ public final class ToolGovernance {
     private static volatile TenantToolPolicy tenantToolPolicy;
     private static volatile ToolApprovalHandler approvalHandler;
     private static volatile ToolAuditSink auditSink = ToolAuditSink.NOOP;
+    private static volatile ToolRuntimePolicy runtimePolicy = ToolRuntimePolicy.defaults();
+    private static volatile TenantRateLimiter tenantRateLimiter;
 
     private ToolGovernance() {
     }
@@ -47,6 +50,8 @@ public final class ToolGovernance {
     public static void reset() {
         configure(ToolScope.unrestricted(), null, ToolAuditSink.NOOP);
         tenantToolPolicy = null;
+        runtimePolicy = ToolRuntimePolicy.defaults();
+        tenantRateLimiter = null;
     }
 
     public static ToolScope toolScope() {
@@ -81,6 +86,14 @@ public final class ToolGovernance {
         auditSink = sink == null ? ToolAuditSink.NOOP : sink;
     }
 
+    public static void setRuntimePolicy(ToolRuntimePolicy policy) {
+        runtimePolicy = policy == null ? ToolRuntimePolicy.defaults() : policy;
+    }
+
+    public static void setTenantRateLimiter(TenantRateLimiter limiter) {
+        tenantRateLimiter = limiter;
+    }
+
     /**
      * 执行工具调用。
      *
@@ -104,6 +117,14 @@ public final class ToolGovernance {
             audit(definition, displayName, context, arguments, ToolAuditStatus.DENIED,
                     start, access.reason());
             throw new ToolAccessDeniedException(access.reason());
+        }
+
+        TenantRateLimiter limiter = tenantRateLimiter;
+        if (limiter != null && context != null && context.tenantId() != null
+                && !limiter.tryAcquire(context.tenantId())) {
+            String reason = "租户 [" + context.tenantId() + "] 工具调用超出速率限制";
+            audit(definition, displayName, context, arguments, ToolAuditStatus.DENIED, start, reason);
+            throw new ToolAccessDeniedException(reason);
         }
 
         if (definition.isRequiresApproval()) {
@@ -132,7 +153,13 @@ public final class ToolGovernance {
         }
 
         try {
-            Object result = definition.invoke(arguments);
+            AgentEventScope.Binding eventBinding = AgentEventScope.capture();
+            Object result = runtimePolicy.execute(displayName, () -> {
+                java.util.function.Supplier<Object> base = () -> definition.invoke(arguments);
+                java.util.function.Supplier<Object> withEvents = eventBinding == null
+                        ? base : () -> AgentEventScope.callWith(eventBinding, base);
+                return AgentCallContext.callWith(context, withEvents);
+            });
             audit(definition, displayName, context, arguments, ToolAuditStatus.SUCCESS, start, null);
             return result;
         } catch (RuntimeException e) {

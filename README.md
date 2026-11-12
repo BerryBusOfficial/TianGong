@@ -18,8 +18,9 @@ TianGong（CraftEngine）是一个面向 Java 21 的轻量 Agent 框架。它把
 - **多 Provider LLM**：OpenAI、DeepSeek、Ollama；流式输出、工具循环、结构化输出。
 - **调用者上下文与工具治理**：`AgentCallContext`（userId / tenantId / scopes / traceId），
   按 scope 过滤工具，支持审批与审计；失败默认拒绝。
-- **护栏与租户策略**：PII 脱敏、提示注入检测、不可信工具输出围栏、工具结果大小上限；
-  租户级工具 scope；HITL 审批队列（`HumanApprovalService`）。
+- **护栏与租户策略**：PII 脱敏、提示注入检测、不可信工具输出围栏、输出哨兵清理、工具结果大小上限；
+  租户级工具 scope 与限流；HITL 审批队列及 HTTP 管理端点。
+- **工具运行时**：超时、重试、按工具熔断、同轮并行工具；客户端断连取消上游流。
 - **类型化 Agent 事件**：正文 / 思考 / 工具调用 / 引用 / 产物 / 用量 / 结构化结果，
   带 `seq`、`runId`、`turnId`，支持 SSE 与 `Last-Event-ID` 续传。
 - **检索与引用**：`Retriever` SPI、scope + tenant ACL、citation 去重与提示词上下文拼装。

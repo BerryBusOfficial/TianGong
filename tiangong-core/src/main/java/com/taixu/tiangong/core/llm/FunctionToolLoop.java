@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import lombok.extern.slf4j.Slf4j;
 import com.taixu.tiangong.common.agent.call.AgentCallContext;
 import com.taixu.tiangong.common.function.Arguments;
+import com.taixu.tiangong.common.thread.VirtualThreads;
 import com.taixu.tiangong.common.util.JsonUtil;
 import com.taixu.tiangong.core.function.AgentFunctionDefinition;
 import com.taixu.tiangong.core.function.FunctionRegistry;
@@ -28,6 +29,10 @@ import com.taixu.tiangong.trace.TraceRecorder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.function.Supplier;
 
 /**
  * 工具循环执行器：把模型请求的工具调用映射到 {@link FunctionRegistry} 里的注册函数，<br>
@@ -50,6 +55,12 @@ import java.util.Map;
 @Slf4j
 public class FunctionToolLoop implements ToolLoop {
 
+    /**
+     * 同轮多个 tool call 的并发执行器。虚拟线程按任务创建，避免为每次对话建线程池；
+     * 工具作者需保证自身线程安全（框架只保证不同调用之间的消息回放顺序）。
+     */
+    private static final ExecutorService TOOL_EXECUTOR = VirtualThreads.newPerTaskExecutor();
+
     private final LlmClient<?, ?> client;
     private final ChatRequest request;
     private final FunctionRegistry functions;
@@ -66,11 +77,59 @@ public class FunctionToolLoop implements ToolLoop {
     @Override
     public ChatStream<?, ?> next(String assistantContent, List<ToolCall> calls) {
         messages.add(assistantToolCalls(assistantContent, calls));
-        for (ToolCall call : calls) {
-            messages.add(MessageFactory.createToolMsg(execute(call), call.id()));
+        List<String> results = executeAll(calls);
+        for (int i = 0; i < calls.size(); i++) {
+            messages.add(MessageFactory.createToolMsg(results.get(i), calls.get(i).id()));
         }
         // 原请求只换 messages：model / tools / chatOptions 原样保留
         return client.stream(request.toBuilder().messages(List.copyOf(messages)).build());
+    }
+
+    /**
+     * 同轮工具并发执行，结果按原始调用顺序回放（OpenAI 协议要求 tool 消息可按任意顺序，
+     * 但保持调用顺序更容易排查，也避免模型对顺序敏感）。单个调用仍走原路径。
+     */
+    private List<String> executeAll(List<ToolCall> calls) {
+        if (calls == null || calls.isEmpty()) {
+            return List.of();
+        }
+        if (calls.size() == 1) {
+            return List.of(execute(calls.getFirst()));
+        }
+        AgentEventScope.Binding eventBinding = AgentEventScope.capture();
+        AgentCallContext.Binding callBinding = AgentCallContext.capture();
+        List<Future<String>> futures = new ArrayList<>(calls.size());
+        for (ToolCall call : calls) {
+            futures.add(TOOL_EXECUTOR.submit(() -> {
+                Supplier<String> base = () -> execute(call);
+                Supplier<String> withEvents = eventBinding == null
+                        ? base : () -> AgentEventScope.callWith(eventBinding, base);
+                Supplier<String> withContext = callBinding == null || callBinding.context() == null
+                        ? withEvents
+                        : () -> AgentCallContext.callWith(callBinding.context(), withEvents);
+                return withContext.get();
+            }));
+        }
+        List<String> results = new ArrayList<>(calls.size());
+        try {
+            for (Future<String> future : futures) {
+                results.add(future.get());
+            }
+        } catch (InterruptedException e) {
+            futures.forEach(future -> future.cancel(true));
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("并行工具执行被中断", e);
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException runtime) {
+                throw runtime;
+            }
+            if (cause instanceof Error error) {
+                throw error;
+            }
+            throw new IllegalStateException("并行工具执行失败", cause);
+        }
+        return results;
     }
 
     /**

@@ -85,6 +85,16 @@ class AgentEventProtocolTest {
     }
 
     @Test
+    void cancelInvokesAllHooks() {
+        AgentEventJournal journal = new AgentEventJournal("run", "turn");
+        int[] calls = {0};
+        journal.onCancel(() -> calls[0]++);
+        journal.onCancel(() -> calls[0]++);
+        assertTrue(journal.cancel());
+        assertEquals(2, calls[0]);
+    }
+
+    @Test
     void cancelInvokesHookAndTerminatesWithCancelled() {
         AgentEventJournal journal = new AgentEventJournal("run", "turn");
         boolean[] cancelled = {false};

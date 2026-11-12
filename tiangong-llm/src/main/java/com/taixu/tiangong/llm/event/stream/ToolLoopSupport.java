@@ -3,6 +3,7 @@ package com.taixu.tiangong.llm.event.stream;
 import com.taixu.tiangong.common.agent.call.AgentCallContext;
 import com.taixu.tiangong.llm.api.request.chat.ChatRequest;
 import com.taixu.tiangong.llm.client.LlmClient;
+import com.taixu.tiangong.protocol.event.AgentEventJournal;
 import com.taixu.tiangong.protocol.event.AgentEventScope;
 
 import java.util.List;
@@ -92,12 +93,27 @@ public final class ToolLoopSupport {
             if (tools != null && !tools.isEmpty()) {
                 ToolLoop loop = f.create(request, client);
                 if (loop != null) {
-                    return new ToolLoopChatStream<>(source, loop, extractor, deltaExtractor,
-                            eventBinding, callBinding);
+                    ChatStream<T, TCall> result = new ToolLoopChatStream<>(source, loop, extractor,
+                            deltaExtractor, eventBinding, callBinding);
+                    bindCancellation(eventBinding, result);
+                    return result;
                 }
             }
         }
-        return eventBinding == null ? source
+        ChatStream<T, TCall> result = eventBinding == null ? source
                 : new EventEmittingChatStream<>(source, deltaExtractor, eventBinding);
+        bindCancellation(eventBinding, result);
+        return result;
+    }
+
+    /**
+     * 把「事件日志取消」接到「流取消」：SSE 客户端断开时 journal.cancel() 会真正
+     * cancel 供应商流/工具循环，而不是只补一条 done=cancelled。
+     * 只在事件出口确实是 journal 时绑定；纯事件 sink/单测不受影响。
+     */
+    private static void bindCancellation(AgentEventScope.Binding binding, ChatStream<?, ?> stream) {
+        if (binding != null && binding.sink() instanceof AgentEventJournal journal) {
+            journal.onCancel(stream::cancel);
+        }
     }
 }

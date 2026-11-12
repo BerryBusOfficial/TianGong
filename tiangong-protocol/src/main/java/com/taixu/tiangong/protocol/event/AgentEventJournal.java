@@ -32,8 +32,7 @@ public final class AgentEventJournal implements AgentEventSink {
 
     private long nextSeq = 1;
     private boolean terminal;
-    private Runnable cancelAction = () -> {
-    };
+    private final List<Runnable> cancelActions = new CopyOnWriteArrayList<>();
 
     public AgentEventJournal(String runId, String turnId) {
         this.runId = Objects.requireNonNull(runId, "runId");
@@ -151,24 +150,30 @@ public final class AgentEventJournal implements AgentEventSink {
         return replayAfter(0);
     }
 
-    /** 设置客户端断开时的取消动作（关闭上游流/中断工作流） */
+    /**
+     * 追加客户端断开时的取消动作（关闭上游流/中断工作流）。<br>
+     * 允许叠加：SSE 宿主、流绑定、工作流各自都需要收尾，不能用后一个覆盖前一个。
+     */
     public void onCancel(Runnable cancelAction) {
-        this.cancelAction = cancelAction == null ? () -> {
-        } : cancelAction;
+        if (cancelAction != null) {
+            cancelActions.add(cancelAction);
+        }
     }
 
     /**
-     * 取消运行：先通知上游收尾，再补一个 {@code done=cancelled}。<br>
+     * 取消运行：先通知所有上游收尾，再补一个 {@code done=cancelled}。<br>
      * 已经终止时幂等返回 false。
      */
     public boolean cancel() {
         if (isTerminal()) {
             return false;
         }
-        try {
-            cancelAction.run();
-        } catch (RuntimeException ignored) {
-            // 上游取消失败不改变「对客户端而言已取消」的语义
+        for (Runnable action : cancelActions) {
+            try {
+                action.run();
+            } catch (RuntimeException ignored) {
+                // 单个上游取消失败不改变「对客户端而言已取消」的语义
+            }
         }
         complete("cancelled");
         return true;

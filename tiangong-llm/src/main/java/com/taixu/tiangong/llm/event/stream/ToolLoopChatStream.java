@@ -69,6 +69,7 @@ public class ToolLoopChatStream<T, TCall> implements ChatStream<T, TCall> {
 
     private volatile boolean cancelled = false;
     private volatile ChatStream<T, TCall> active;
+    private volatile Thread runner;
 
     ToolLoopChatStream(ChatStream<T, TCall> first, ToolLoop loop, Function<TCall, ToolCall> extractor) {
         this(first, loop, extractor, null, null, null);
@@ -150,6 +151,12 @@ public class ToolLoopChatStream<T, TCall> implements ChatStream<T, TCall> {
         if (current != null) {
             current.cancel();
         }
+        // 正在执行工具（parallel tool 的 Future.get / 工具运行时等待）时，
+        // 仅 cancel 供应商流不会打断工具线程；中断 runner 让它尽快退出。
+        Thread running = runner;
+        if (running != null && running != Thread.currentThread()) {
+            running.interrupt();
+        }
     }
 
     @Override
@@ -168,18 +175,23 @@ public class ToolLoopChatStream<T, TCall> implements ChatStream<T, TCall> {
     }
 
     private void run() {
-        // 事件绑定在创建流时捕获；读取发生在本虚拟线程里，ThreadLocal 不会自动继承，
-        // 所以这里显式恢复作用域，工具循环里的 FunctionToolLoop 才能发 tool 事件。
-        Runnable body = eventBinding == null
-                ? this::runLoop
-                : () -> AgentEventScope.runWith(eventBinding, this::runLoop);
-        // 调用者身份必须一起搬运：工具执行发生在读流线程里，
-        // 不绑定的话 FunctionToolLoop 看到的 AgentCallContext 是 null，
-        // 带 scope 的工具会被误判为「无权限」。
-        if (callBinding == null || callBinding.context() == null) {
-            body.run();
-        } else {
-            callBinding.run(body);
+        runner = Thread.currentThread();
+        try {
+            // 事件绑定在创建流时捕获；读取发生在本虚拟线程里，ThreadLocal 不会自动继承，
+            // 所以这里显式恢复作用域，工具循环里的 FunctionToolLoop 才能发 tool 事件。
+            Runnable body = eventBinding == null
+                    ? this::runLoop
+                    : () -> AgentEventScope.runWith(eventBinding, this::runLoop);
+            // 调用者身份必须一起搬运：工具执行发生在读流线程里，
+            // 不绑定的话 FunctionToolLoop 看到的 AgentCallContext 是 null，
+            // 带 scope 的工具会被误判为「无权限」。
+            if (callBinding == null || callBinding.context() == null) {
+                body.run();
+            } else {
+                callBinding.run(body);
+            }
+        } finally {
+            runner = null;
         }
     }
 
@@ -220,6 +232,9 @@ public class ToolLoopChatStream<T, TCall> implements ChatStream<T, TCall> {
                     break;
                 }
                 ChatStream<?, ?> next = loop.next(result.content(), calls.stream().map(extractor).toList());
+                if (cancelled) {
+                    break;                                          // 工具执行期间客户端已断开
+                }
                 if (next == null) {
                     break;                                          // 处理器主动结束
                 }

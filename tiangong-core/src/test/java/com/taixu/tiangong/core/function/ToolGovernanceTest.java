@@ -62,6 +62,23 @@ class ToolGovernanceTest {
     }
 
     @Test
+    void tenantRateLimitIsIsolatedAndDeniesBurst() {
+        ToolGovernance.setTenantRateLimiter(new TenantRateLimiter(1, 1));
+        AgentCallContext tenantA = new AgentCallContext("u-1", "tenant-a",
+                Set.of("report:*"), "trace-1");
+        AgentCallContext tenantB = new AgentCallContext("u-1", "tenant-b",
+                Set.of("report:*"), "trace-2");
+
+        AgentCallContext.callWith(tenantA,
+                () -> ToolGovernance.invoke(draftTool, Map.of("text", "one"), "draft"));
+        assertThrows(ToolAccessDeniedException.class, () -> AgentCallContext.callWith(tenantA,
+                () -> ToolGovernance.invoke(draftTool, Map.of("text", "two"), "draft")));
+        // 另一个租户有自己的桶
+        AgentCallContext.callWith(tenantB,
+                () -> ToolGovernance.invoke(draftTool, Map.of("text", "three"), "draft"));
+    }
+
+    @Test
     void missingScopeIsDenied() {
         AgentCallContext context = new AgentCallContext("u-1", "t", Set.of("report:read"), "trace");
         assertThrows(ToolAccessDeniedException.class, () -> AgentCallContext.callWith(context,

@@ -112,6 +112,11 @@ public final class StreamingModelRouteExecutor {
                         attempts.add(RoutedAttempt.error(candidate, elapsed(startNanos), "stream 为 null"));
                         break;
                     }
+                    // 真实事件日志（SSE 的 journal）取消时，必须打断当前候选流，
+                    // 否则客户端断开后模型/工具仍会继续跑完。
+                    if (real != null && real.sink() instanceof AgentEventJournal runJournal) {
+                        runJournal.onCancel(stream::cancel);
+                    }
 
                     Throwable failure = null;
                     try (AgentEventJournal.Subscription ignored =
