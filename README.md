@@ -80,7 +80,7 @@ flowchart LR
         <dependency>
             <groupId>io.github.berrybus-official</groupId>
             <artifactId>tiangong-bom</artifactId>
-            <version>0.0.1</version>
+            <version>0.0.2</version>
             <type>pom</type>
             <scope>import</scope>
         </dependency>
@@ -259,14 +259,14 @@ mvn -DskipTests package
 
 ## 版本
 
-当前发布版本 `0.0.1`，已发布到 Maven Central；`main` 分支开发版本为
-`0.0.2-SNAPSHOT`（包含护栏、租户工具策略与 HITL 审批，尚未发布）。
+当前发布版本 `0.0.2`，已发布到 Maven Central（2026-11-12），包含 P2 护栏、HITL、
+租户工具策略/限流与工具运行时。
 
 ```xml
 <dependency>
     <groupId>io.github.berrybus-official</groupId>
     <artifactId>tiangong-core</artifactId>
-    <version>0.0.1</version>
+    <version>0.0.2</version>
 </dependency>
 ```
 
