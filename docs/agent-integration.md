@@ -129,10 +129,61 @@ ReportDraft draft = StructuredOutputRunner.run(client, request, spec);
 * 通过校验后发 `structured` 事件；正文不再泄漏哨兵标记，前端不必从散文里抠 JSON。
 * `StreamingJsonExtractor` 提供流式提取（边收 delta 边判断完整 JSON），供 UI 提前渲染。
 
-## 4. 本轮边界
+## 4. P1：检索/记忆 SPI + citation/ACL
+
+```java
+RetrieverRegistry registry = new RetrieverRegistry();
+registry.register(new VectorRetriever(...));          // 只负责召回
+RetrievalService retrieval = new RetrievalService(registry);
+
+List<RetrievedDocument> docs = retrieval.retrieve("report-chunks",
+        new RetrievalQuery("本周谁没交", 5, Map.of()));
+String context = RetrievalService.toPromptBlock(docs);
+```
+
+* `Retriever` 只做召回（向量库/全文/图扩散/记忆事实都可以）；权限判断不写进实现。
+* `DocumentAcl.scopeBased()` 在结果进入提示词前统一裁剪：
+  `requiredScopes` 全部命中 + `metadata.tenantId` 与调用者租户一致。
+  私有文档必须由 retriever 如实标注，框架不能猜密级。
+* `CitationCollector` 按 `docId` 去重并发 `citation` 事件；同一篇文档被多个 retriever
+  命中时前端只收到一次。
+* `retrieve(List.of("vector", "graph"), query)` 支持多检索器合并：按 docId 去重并保留
+  更高 score，适合「向量召回 + 图扩散 + 记忆事实」一次进上下文。
+* `toPromptBlock` 输出带 `[1]` 编号、docId、来源 URL 与摘要的上下文块；引用编号稳定，
+  模型可以在正文里写 `[1]`。
+
+## 5. P1：模型路由 + 成本
+
+```java
+ModelRouter router = StaticModelRouter.builder()
+        .route(ModelRoute.of("report", "deepseek-flash", "deepseek-pro", "local-ollama"))
+        .defaultRoute("deepseek-pro")
+        .build();
+
+ModelRouteExecutor executor = new ModelRouteExecutor(router, clients, pricing, ledger,
+        (name, messages, route) -> registry.buildChatRequest(name, messages, false, tools),
+        1);                                        // 空回答同候选重试 1 次
+
+RoutedResult result = executor.chat("report", messages);
+```
+
+* `ModelRoute` 是任务语义（report/chat/classify），候选链可替换；执行器负责按链降级、
+  空回答重试、保留完整尝试链（为什么走了 pro）。
+* `CostLedger` 记录 run/node/user/tenant/model/token/成本；`PricingTable` 用
+  「微美元/百万 token」避免浮点累加误差。
+* `TenantBudgetGuard` 在调用前读取该租户已花费，超过上限直接抛
+  `BudgetExceededException`（软预算：并发请求可能同时通过，强一致需要账本侧原子扣减）。
+* 默认请求工厂只用 clientName 当 model；生产应传入基于 `LlmRegistry` 的工厂，
+  让 model/options/tools 由配置决定。
+
+## 6. 本轮边界
 
 * SSE 端点是独立的 `AgentEventSseServer`，尚未接进 `ApiHttpServer` 的
   `@ApiEntranceNode` 路由；下一轮把它做成入口的一种出口类型。
-* 检索/记忆 SPI、ACL、按任务模型路由、token 预算/成本、可观测回放：P1。
+* 检索 ACL 只能校验 retriever 返回的 `requiredScopes/tenantId` 声明；召回前分区与
+  文档密级标注是 retriever 的职责。
+* 路由执行器目前只覆盖**同步**调用；流式降级（已吐出的正文不能撤回）未实现。
+  `maxReasoningTokens` 目前是路由元数据，尚未做硬截止；租户预算是软校验，强一致扣减与
+  Trace 回放也未落地。
 * 指令注入/输出过滤/租户隔离、HITL 审批节点、工具超时/重试/熔断：P2。
 * `ToolGovernance` 是进程级静态配置；多租户不同策略需要 P2 的租户级作用域。

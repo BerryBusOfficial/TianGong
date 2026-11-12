@@ -25,6 +25,7 @@
         <module>tiangong-memory</module>
         <module>tiangong-common</module>
         <module>tiangong-protocol</module>
+        <module>tiangong-retrieval</module>
         <module>tiangong-history</module>
         <module>tiangong-bytebuddy</module>
         <module>tiangong-test</module>

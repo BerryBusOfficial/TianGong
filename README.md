@@ -9,6 +9,7 @@
 | `tiangong-annotations` | 注解与注解处理器（组件/节点/工具/生命周期） |
 | `tiangong-common` | 公共类型、异常、JSON、沙箱、调用者上下文（`AgentCallContext`） |
 | `tiangong-protocol` | 类型化 Agent 流式事件协议：事件模型、SSE 编解码、内存日志、客户端 SDK |
+| `tiangong-retrieval` | 检索/记忆 SPI：`Retriever`、ACL、citation 事件、提示词上下文拼装 |
 | `tiangong-llm` | Deepseek / OpenAI / Ollama 客户端、流式工具循环、结构化输出请求 |
 | `tiangong-core` | 容器、AgentLoop、工作流调度、工具治理、检查点、Trace、HTTP 入口 |
 | `tiangong-memory` | 记忆扩展 |
@@ -43,6 +44,15 @@ mvn -DskipTests package
    校验通过发 `structured` 事件，不再用 `<<<REPORT_DRAFT>>>` 一类哨兵从正文抠 JSON。
 
 完整用法与边界见 [docs/agent-integration.md](docs/agent-integration.md)。
+
+## 第二轮 P1（进行中）
+
+* **检索/记忆 SPI**：`Retriever` 只负责召回；`RetrievalService` 统一做 ACL（scope + tenant）、
+  排序截断、citation 事件与 `toPromptBlock`。换向量库/图扩散不改业务。
+* **模型路由 + 成本**：`ModelRouter` 按任务给候选链；`ModelRouteExecutor` 按链降级、
+  空回答重试、记录 `RoutedAttempt`，并通过 `CostLedger` 记 token/成本；`TenantBudgetGuard`
+  在调用前做租户软预算检查。当前只覆盖同步调用；流式路由、推理 token 硬预算、强一致租户
+  扣减与 Trace 回放尚未实现（见文档边界）。
 
 ## 设计原则
 
