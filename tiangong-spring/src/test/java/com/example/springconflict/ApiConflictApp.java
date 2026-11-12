@@ -2,10 +2,10 @@ package com.example.springconflict;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.wutong.tiangong.annotations.annotation.framework.enable.EnableApi;
-import org.wutong.tiangong.annotations.annotation.framework.enable.EnableAgentLoop;
-import org.wutong.tiangong.spring.annotation.EnableTianGong;
-import org.wutong.tiangong.spring.test.TestBridgeContext;
+import com.taixu.tiangong.annotations.annotation.framework.enable.EnableApi;
+import com.taixu.tiangong.annotations.annotation.framework.enable.EnableAgentLoop;
+import com.taixu.tiangong.spring.annotation.EnableTianGong;
+import com.taixu.tiangong.spring.test.TestBridgeContext;
 
 /**
  * 反例应用：Spring 宿主 + {@code @EnableApi}（API 禁用模式下必须启动期报错）。<br>

@@ -1,7 +1,10 @@
 package org.wutong.tiangong.user.model;
 
+import com.taixu.tiangong.common.enums.Namespace;
+import com.taixu.tiangong.common.enums.ResourceType;
+import com.taixu.tiangong.common.util.IdGenerator;
 import lombok.Data;
-import org.wutong.tiangong.llm.message.Message;
+import com.taixu.tiangong.llm.message.Message;
 
 /**
  * 一条历史记录。<br>
@@ -29,8 +32,8 @@ public class HistoryItem {
         this.role = message == null ? "unknown" : String.valueOf(message.getRole());
         this.content = message == null ? "" : message.getContent();
         this.time = java.time.LocalDateTime.now().toString();
-        this.itemId = org.wutong.tiangong.common.util.IdGenerator.generate(
-                org.wutong.tiangong.common.enums.Namespace.AGENT,
-                org.wutong.tiangong.common.enums.ResourceType.SESSION);
+        this.itemId = IdGenerator.generate(
+                Namespace.AGENT,
+                ResourceType.SESSION);
     }
 }

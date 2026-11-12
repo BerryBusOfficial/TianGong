@@ -2,10 +2,10 @@ package org.wutong.tiangong.user.tool;
 
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.wutong.tiangong.annotations.annotation.framework.agent.AgentFunction;
-import org.wutong.tiangong.annotations.annotation.framework.agent.AgentTool;
-import org.wutong.tiangong.annotations.annotation.framework.agent.ToolNames;
-import org.wutong.tiangong.annotations.annotation.framework.inject.Inject;
+import com.taixu.tiangong.annotations.annotation.framework.agent.AgentFunction;
+import com.taixu.tiangong.annotations.annotation.framework.agent.AgentTool;
+import com.taixu.tiangong.annotations.annotation.framework.agent.ToolNames;
+import com.taixu.tiangong.annotations.annotation.framework.inject.Inject;
 import org.wutong.tiangong.user.memory.PetMemory;
 import org.wutong.tiangong.user.model.Mood;
 

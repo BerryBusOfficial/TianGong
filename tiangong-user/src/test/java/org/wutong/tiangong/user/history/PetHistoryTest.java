@@ -3,7 +3,7 @@ package org.wutong.tiangong.user.history;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.wutong.tiangong.llm.message.HumanMessage;
+import com.taixu.tiangong.llm.message.HumanMessage;
 import org.wutong.tiangong.user.model.HistoryItem;
 
 import java.nio.file.Path;

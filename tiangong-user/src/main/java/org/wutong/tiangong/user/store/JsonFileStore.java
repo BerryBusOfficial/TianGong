@@ -1,7 +1,7 @@
 package org.wutong.tiangong.user.store;
 
 import lombok.extern.slf4j.Slf4j;
-import org.wutong.tiangong.common.util.JsonUtil;
+import com.taixu.tiangong.common.util.JsonUtil;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

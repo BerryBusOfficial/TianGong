@@ -1,6 +1,6 @@
 package com.example.api;
 
-import org.wutong.tiangong.annotations.annotation.framework.enable.EnableApi;
+import com.taixu.tiangong.annotations.annotation.framework.enable.EnableApi;
 
 /**
  * 模拟「框架包之外」的启动类：包名 {@code com.example.api} 不在 {@code org.wutong.tiangong} 下。<br>

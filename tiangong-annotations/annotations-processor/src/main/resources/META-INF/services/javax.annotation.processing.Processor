@@ -1,2 +1,2 @@
-org.wutong.tiangong.annotations.processor.StorageRecordProcessor
-org.wutong.tiangong.annotations.processor.ToolNamesProcessor
+com.taixu.tiangong.annotations.processor.StorageRecordProcessor
+com.taixu.tiangong.annotations.processor.ToolNamesProcessor

@@ -1,0 +1,19 @@
+package com.taixu.tiangong.core.storage;
+
+import com.taixu.tiangong.annotations.annotation.framework.field.StorageFields;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+
+@Getter
+@RequiredArgsConstructor
+public class TestStorageRecord implements StorageRecord<Long> {
+
+    @StorageFields(name = "id")
+    private final Long id;
+
+    @Override
+    public Long getId() {
+        return id;
+    }
+
+}

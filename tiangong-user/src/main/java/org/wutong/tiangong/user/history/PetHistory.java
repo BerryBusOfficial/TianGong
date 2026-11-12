@@ -2,10 +2,10 @@ package org.wutong.tiangong.user.history;
 
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.wutong.tiangong.annotations.annotation.framework.Component;
-import org.wutong.tiangong.annotations.annotation.framework.inject.Value;
-import org.wutong.tiangong.common.agent.capability.AgentCapability;
-import org.wutong.tiangong.llm.message.Message;
+import com.taixu.tiangong.annotations.annotation.framework.Component;
+import com.taixu.tiangong.annotations.annotation.framework.inject.Value;
+import com.taixu.tiangong.common.agent.capability.AgentCapability;
+import com.taixu.tiangong.llm.message.Message;
 import org.wutong.tiangong.user.model.HistoryItem;
 import org.wutong.tiangong.user.model.HistorySnapshot;
 import org.wutong.tiangong.user.store.JsonFileStore;

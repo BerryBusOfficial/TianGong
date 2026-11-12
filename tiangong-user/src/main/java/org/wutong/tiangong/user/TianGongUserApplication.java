@@ -1,13 +1,13 @@
 package org.wutong.tiangong.user;
 
-import org.wutong.tiangong.annotations.annotation.framework.TianGongApplicationStarter;
-import org.wutong.tiangong.annotations.annotation.framework.enable.EnableAgentLoop;
-import org.wutong.tiangong.annotations.annotation.framework.enable.EnableApi;
-import org.wutong.tiangong.annotations.annotation.framework.enable.EnableCheckpoint;
-import org.wutong.tiangong.annotations.annotation.framework.enable.EnableMcp;
-import org.wutong.tiangong.annotations.annotation.framework.enable.EnableSkill;
-import org.wutong.tiangong.common.exception.SystemException;
-import org.wutong.tiangong.boot.TianGongApplication;
+import com.taixu.tiangong.annotations.annotation.framework.TianGongApplicationStarter;
+import com.taixu.tiangong.annotations.annotation.framework.enable.EnableAgentLoop;
+import com.taixu.tiangong.annotations.annotation.framework.enable.EnableApi;
+import com.taixu.tiangong.annotations.annotation.framework.enable.EnableCheckpoint;
+import com.taixu.tiangong.annotations.annotation.framework.enable.EnableMcp;
+import com.taixu.tiangong.annotations.annotation.framework.enable.EnableSkill;
+import com.taixu.tiangong.common.exception.SystemException;
+import com.taixu.tiangong.boot.TianGongApplication;
 import org.wutong.tiangong.user.context.PetContext;
 
 // API 通道开关：打开后 ApiHttpServer 监听 agent.api.port，
@@ -17,7 +17,7 @@ import org.wutong.tiangong.user.context.PetContext;
 // 桌宠有两个 START 节点（STDIN / API），框架为每条链各起一条常驻工作流，
 // 触发策略默认 REJECT —— 同一条链不会重复启动，正好是「常驻单实例」语义。
 @EnableAgentLoop(contextClass = PetContext.class)
-// 检查点开关（docs/checkpoint-contract.md）。删掉或改成 value = false 即关闭。
+// 检查点开关（office/checkpoint-contract.md）。删掉或改成 value = false 即关闭。
 // 刻意不并入 @TianGongApplicationStarter —— 开启会改变失败语义（快照失败即中断工作流），
 // 且要求上下文可完整往返。PetContext 满足：三个协作对象都标了 @SnapshotIgnore，
 // 并在 afterRestore() 里从容器取回。

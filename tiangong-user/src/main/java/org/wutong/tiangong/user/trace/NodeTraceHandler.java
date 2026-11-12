@@ -1,9 +1,9 @@
 package org.wutong.tiangong.user.trace;
 
 import lombok.extern.slf4j.Slf4j;
-import org.wutong.tiangong.annotations.annotation.framework.Component;
-import org.wutong.tiangong.core.trace.TraceFieldEvent;
-import org.wutong.tiangong.core.trace.TraceHandler;
+import com.taixu.tiangong.annotations.annotation.framework.Component;
+import com.taixu.tiangong.core.trace.TraceFieldEvent;
+import com.taixu.tiangong.core.trace.TraceHandler;
 import org.wutong.tiangong.user.util.StringUtil;
 
 @Slf4j

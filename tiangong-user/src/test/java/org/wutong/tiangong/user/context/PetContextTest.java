@@ -3,8 +3,8 @@ package org.wutong.tiangong.user.context;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.wutong.tiangong.llm.message.HumanMessage;
-import org.wutong.tiangong.llm.message.Message;
+import com.taixu.tiangong.llm.message.HumanMessage;
+import com.taixu.tiangong.llm.message.Message;
 import org.wutong.tiangong.user.history.PetHistory;
 import org.wutong.tiangong.user.memory.PetMemory;
 

@@ -2,8 +2,8 @@ package com.example.multiprocess;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.wutong.tiangong.spring.annotation.EnableTianGong;
-import org.wutong.tiangong.spring.annotation.MultiProcess;
+import com.taixu.tiangong.spring.annotation.EnableTianGong;
+import com.taixu.tiangong.spring.annotation.MultiProcess;
 
 /**
  * 反例应用：分进程模式（{@code @MultiProcess}）+ 同进程自举（{@code @EnableTianGong}）

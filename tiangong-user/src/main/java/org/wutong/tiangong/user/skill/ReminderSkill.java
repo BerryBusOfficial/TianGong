@@ -1,7 +1,7 @@
 package org.wutong.tiangong.user.skill;
 
-import org.wutong.tiangong.annotations.annotation.framework.Component;
-import org.wutong.tiangong.core.skill.Skill;
+import com.taixu.tiangong.annotations.annotation.framework.Component;
+import com.taixu.tiangong.core.skill.Skill;
 
 import java.util.List;
 
