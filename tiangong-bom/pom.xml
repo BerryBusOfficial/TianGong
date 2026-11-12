@@ -6,7 +6,7 @@
 
     <groupId>io.github.berrybus-official</groupId>
     <artifactId>tiangong-bom</artifactId>
-    <version>0.0.2-SNAPSHOT</version>
+    <version>0.0.2</version>
     <packaging>pom</packaging>
 
     <name>TianGong Bill of Materials</name>

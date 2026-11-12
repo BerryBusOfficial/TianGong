@@ -6,7 +6,7 @@
     <parent>
         <groupId>io.github.berrybus-official</groupId>
         <artifactId>tiangong</artifactId>
-        <version>0.0.2-SNAPSHOT</version>
+        <version>0.0.2</version>
     </parent>
 
     <artifactId>tiangong-math</artifactId>
@@ -18,7 +18,7 @@
         <dependency>
             <groupId>io.github.berrybus-official</groupId>
             <artifactId>tiangong-common</artifactId>
-            <version>0.0.2-SNAPSHOT</version>
+            <version>0.0.2</version>
             <scope>compile</scope>
         </dependency>
     </dependencies>

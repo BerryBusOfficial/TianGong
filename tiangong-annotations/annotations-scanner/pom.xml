@@ -6,7 +6,7 @@
     <parent>
         <groupId>io.github.berrybus-official</groupId>
         <artifactId>tiangong-annotations</artifactId>
-        <version>0.0.2-SNAPSHOT</version>
+        <version>0.0.2</version>
     </parent>
 
     <artifactId>annotations-scanner</artifactId>
