@@ -97,8 +97,21 @@ mvn -DskipTests package
 发布前准备：
 
 * 在 Central Portal 获取 token，写入 `~/.m2/settings.xml` 的 `central` server；
-* 准备 GPG key，并让 `gpg` 可用（可用 `gpg.passphrase` 或 agent）；
+* 生成/导入 GPG 签名密钥，并上传公钥到 keyserver（如 `keyserver.ubuntu.com`）；
 * 确认 GitHub 账号 `berrybus-official` 拥有 `io.github.berrybus-official` 命名空间。
+
+Windows 上 GPG 通常不在 Maven 进程 PATH 里，先补 PATH：
+
+```powershell
+$env:PATH = "C:\Program Files\GnuPG\bin;$env:PATH"
+gpg --list-secret-keys --keyid-format LONG
+# 没有密钥时：
+# gpg --full-generate-key
+# gpg --keyserver keyserver.ubuntu.com --send-keys <KEY_ID>
+```
+
+签名口令由 gpg-agent / Kleopatra pinentry 处理。CI 无交互时可在 `settings.xml` 配置
+`gpg.passphrase`，或用 `-Dgpg.passphrase=...`（不要提交到仓库）。
 
 ```bash
 # 正常构建不会签名/发布
