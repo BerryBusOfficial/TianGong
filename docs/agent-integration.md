@@ -174,8 +174,9 @@ RoutedResult result = executor.chat("report", messages);
   近似（中文约 1 字≈1 token，英文偏高），不内置厂商 tokenizer；精确计费仍看 provider usage。
 * `CostLedger` 记录 run/node/user/tenant/model/token/成本；`PricingTable` 用
   「微美元/百万 token」避免浮点累加误差。
-* `TenantBudgetGuard` 在调用前读取该租户已花费，超过上限直接抛
-  `BudgetExceededException`（软预算：并发请求可能同时通过，强一致需要账本侧原子扣减）。
+* `TenantBudgetGuard` 在调用前做**原子预留**：`spent + 已预留 + 本次估算 ≤ limit` 才放行，
+  调用结束释放预留；并发请求不会同时穿透预算。估算按 prompt 字符数 + `maxOutputTokens`，
+  不是账单；跨进程/多实例仍需账本侧（DB/Redis）原子扣减。
 * 默认请求工厂只用 clientName 当 model；生产应传入基于 `LlmRegistry` 的工厂，
   让 model/options/tools 由配置决定。
 
@@ -213,7 +214,8 @@ session.assertExhausted();
 * 检索 ACL 只能校验 retriever 返回的 `requiredScopes/tenantId` 声明；召回前分区与
   文档密级标注是 retriever 的职责。
 * 路由执行器目前只覆盖**同步**调用；流式降级（已吐出的正文不能撤回）未实现。
-  `maxReasoningTokens` 已由流层硬截止（字符近似），租户预算是软校验，强一致扣减未做。
+  `maxReasoningTokens` 已由流层硬截止（字符近似）。租户预算用内存账本做了原子预留/释放；
+  跨进程/多实例的强一致扣减未做。
 * `TraceRecorder` 提供 golden trace 校验回放；工作流级「从失败点继续执行」仍依赖检查点，
   trace 不还原上下文。`TextRedactor` 是规则脱敏，不是完备 DLP；敏感数据不应进入 trace。
 * 指令注入/输出过滤/租户隔离、HITL 审批节点、工具超时/重试/熔断：P2。

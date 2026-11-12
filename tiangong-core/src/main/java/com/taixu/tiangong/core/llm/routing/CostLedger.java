@@ -13,6 +13,20 @@ public interface CostLedger {
         return 0;
     }
 
+    /**
+     * 原子预留预算（用于并发场景的强一致检查）。<br>
+     * 默认实现不预留、直接放行；能保证并发的账本应覆盖本方法。
+     *
+     * @return true = 预留成功；false = 超预算
+     */
+    default boolean tryReserve(String tenantId, long micros, long limitMicros) {
+        return true;
+    }
+
+    /** 释放预留额度（调用结束、无论成功失败都要释放） */
+    default void release(String tenantId, long micros) {
+    }
+
     CostLedger NOOP = new CostLedger() {
         @Override
         public void record(CostEntry entry) {

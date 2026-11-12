@@ -154,6 +154,69 @@ class ModelRouteExecutorTest {
         assertEquals(0, flash.calls);
     }
 
+    @Test
+    void budgetReservationBlocksBeforeCallingClient() {
+        InMemoryCostLedger ledger = new InMemoryCostLedger();
+        TenantBudgetGuard guard = TenantBudgetGuard.builder(ledger)
+                .limit("tenant-1", 500)
+                .build();
+        FakeClient flash = new FakeClient("ok", 1, 1, null);
+        ModelRoute route = new ModelRoute("report", List.of("flash"), 0, 1000);
+        ModelRouteExecutor executor = new ModelRouteExecutor(
+                StaticModelRouter.builder().route(route).build(),
+                Map.of("flash", flash),
+                PricingTable.builder().defaultPricing(new ModelPricing(1_000_000, 1_000_000, "USD")).build(),
+                ledger, guard,
+                (name, messages, r) -> ChatRequest.builder()
+                        .model(name).messages(messages).stream(false).build(), 0);
+
+        AgentCallContext context = new AgentCallContext("u-1", "tenant-1", Set.of(), "trace");
+        assertThrows(BudgetExceededException.class,
+                () -> AgentCallContext.callWith(context,
+                        () -> executor.chat("report", List.of(new HumanMessage("hi")))));
+        assertEquals(0, flash.calls);
+        assertEquals(0, ledger.reservedMicros("tenant-1"));
+    }
+
+    @Test
+    void reservationIsReleasedAfterSuccess() {
+        InMemoryCostLedger ledger = new InMemoryCostLedger();
+        TenantBudgetGuard guard = TenantBudgetGuard.builder(ledger)
+                .limit("tenant-1", 5000)
+                .build();
+        ModelRoute route = new ModelRoute("report", List.of("flash"), 0, 1000);
+        ModelRouteExecutor executor = new ModelRouteExecutor(
+                StaticModelRouter.builder().route(route).build(),
+                Map.of("flash", new FakeClient("ok", 1, 1, null)),
+                PricingTable.builder().defaultPricing(new ModelPricing(1, 1, "USD")).build(),
+                ledger, guard,
+                (name, messages, r) -> ChatRequest.builder()
+                        .model(name).messages(messages).stream(false).build(), 0);
+
+        AgentCallContext context = new AgentCallContext("u-1", "tenant-1", Set.of(), "trace");
+        AgentCallContext.callWith(context,
+                () -> executor.chat("report", List.of(new HumanMessage("hi"))));
+
+        assertEquals(0, ledger.reservedMicros("tenant-1"));
+        assertEquals(1, ledger.entries().size());
+    }
+
+    @Test
+    void tenantGuardReservationIsAtomicAndReleasable() {
+        InMemoryCostLedger ledger = new InMemoryCostLedger();
+        TenantBudgetGuard guard = TenantBudgetGuard.builder(ledger)
+                .limit("tenant-1", 1000)
+                .build();
+        AgentCallContext context = new AgentCallContext("u-1", "tenant-1", Set.of(), "trace");
+
+        BudgetGuard.Reservation first = guard.reserve(context, 600);
+        assertThrows(BudgetExceededException.class, () -> guard.reserve(context, 600));
+        first.settle(0);
+        BudgetGuard.Reservation second = guard.reserve(context, 600);
+        second.settle(0);
+        assertEquals(0, ledger.reservedMicros("tenant-1"));
+    }
+
     private static ModelRouteExecutor executor(InMemoryCostLedger ledger, int emptyRetries,
                                                Map<String, LlmClient<?, ?>> clients) {
         ModelRouter router = StaticModelRouter.builder()

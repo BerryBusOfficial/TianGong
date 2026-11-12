@@ -99,43 +99,65 @@ public final class ModelRouteExecutor {
                 attempts.add(RoutedAttempt.error(candidate, 0, "未注册客户端"));
                 continue;
             }
-            for (int attempt = 0; attempt <= emptyRetries; attempt++) {
-                long startNanos = System.nanoTime();
-                ModelPricing price = pricing.priceFor(candidate);
-                try {
-                    ChatRequest request = requestFactory.create(candidate, safeMessages, route);
-                    ChatResponse<?> response = client.chat(request).join();
-                    TokenUsage usage = UsageExtractor.extract(response);
-                    String content = response == null ? null : response.getContent();
-                    long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
-                    if (content == null || content.isBlank()) {
-                        attempts.add(RoutedAttempt.empty(candidate, elapsedMs));
+            ModelPricing price = pricing.priceFor(candidate);
+            long estimatedMicros = estimateMicros(route, safeMessages, price);
+            BudgetGuard.Reservation reservation = budgetGuard.reserve(context, estimatedMicros);
+            long actualCostMicros = 0;
+            try {
+                for (int attempt = 0; attempt <= emptyRetries; attempt++) {
+                    long startNanos = System.nanoTime();
+                    try {
+                        ChatRequest request = requestFactory.create(candidate, safeMessages, route);
+                        ChatResponse<?> response = client.chat(request).join();
+                        TokenUsage usage = UsageExtractor.extract(response);
+                        String content = response == null ? null : response.getContent();
+                        long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+                        if (content == null || content.isBlank()) {
+                            attempts.add(RoutedAttempt.empty(candidate, elapsedMs));
+                            TraceRecorder.recordLlm(candidate, safeMessages, "", 0, 0, 0, 0,
+                                    price.currency(), elapsedMs, "empty", null);
+                            continue;
+                        }
+                        attempts.add(RoutedAttempt.success(candidate, elapsedMs, usage));
+                        long cost = price.costMicros(usage.promptTokens(), usage.completionTokens());
+                        recordCost(candidate, usage, cost, price, context);
+                        TraceRecorder.recordLlm(candidate, safeMessages, content,
+                                usage.promptTokens(), usage.completionTokens(), usage.totalTokens(),
+                                cost, price.currency(), elapsedMs, "success", null);
+                        actualCostMicros = cost;
+                        return new RoutedResult(candidate, response, attempts);
+                    } catch (RuntimeException e) {
+                        long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+                        attempts.add(RoutedAttempt.error(candidate, elapsedMs, e.getMessage()));
                         TraceRecorder.recordLlm(candidate, safeMessages, "", 0, 0, 0, 0,
-                                price.currency(), elapsedMs, "empty", null);
-                        continue;
+                                price.currency(), elapsedMs, "error", e.getMessage());
+                        break;   // 同候选不因异常重试；直接降级，避免把一次持续故障放大成 N 次
                     }
-                    attempts.add(RoutedAttempt.success(candidate, elapsedMs, usage));
-                    long cost = price.costMicros(usage.promptTokens(), usage.completionTokens());
-                    recordCost(candidate, usage, cost, price, context);
-                    TraceRecorder.recordLlm(candidate, safeMessages, content,
-                            usage.promptTokens(), usage.completionTokens(), usage.totalTokens(),
-                            cost, price.currency(), elapsedMs, "success", null);
-                    return new RoutedResult(candidate, response, attempts);
-                } catch (RuntimeException e) {
-                    long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
-                    attempts.add(RoutedAttempt.error(candidate, elapsedMs, e.getMessage()));
-                    TraceRecorder.recordLlm(candidate, safeMessages, "", 0, 0, 0, 0,
-                            price.currency(), elapsedMs, "error", e.getMessage());
-                    break;   // 同候选不因异常重试；直接降级，避免把一次持续故障放大成 N 次
                 }
+            } finally {
+                // 只在这里 settle 一次：成功带实际成本，失败/空回答带 0；预留必须释放
+                reservation.settle(actualCostMicros);
             }
         }
         throw new RoutingException("任务 [" + task + "] 的所有候选模型均失败: " + attempts);
     }
 
+    /**
+     * 预留估算：prompt 字符数（保守上界）+ 路由的 maxOutputTokens（未配置按 512）。
+     * 这不是账单，只是预算闸门的估计；实际成本仍由 provider usage 结算。
+     */
+    private static long estimateMicros(ModelRoute route, List<Message> messages, ModelPricing price) {
+        long promptChars = messages.stream()
+                .mapToLong(message -> message.getContent() == null
+                        ? 0 : message.getContent().length())
+                .sum();
+        long promptTokens = Math.max(64, promptChars);
+        long completionTokens = route.maxOutputTokens() > 0 ? route.maxOutputTokens() : 512;
+        return price.costMicros(promptTokens, completionTokens);
+    }
+
     private void recordCost(String model, TokenUsage usage, long cost, ModelPricing price,
-                            AgentCallContext context) {
-        if (ledger == CostLedger.NOOP) {
+                            AgentCallContext context) {        if (ledger == CostLedger.NOOP) {
             return;
         }
         ledger.record(new CostEntry(
